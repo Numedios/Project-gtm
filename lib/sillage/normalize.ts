@@ -83,12 +83,12 @@ export function normaliserProfilMapping(
   const date = profil.position_start_date ?? dateMapping;
   const observations: ObservationsParChamp = {};
 
-  const [prenom, ...resteNom] = (profil.name ?? '').trim().split(/\s+/);
-  ajouter(observations, 'prenom', prenom || null, date, CONFIANCE_PROFIL_LEAD);
-  ajouter(observations, 'nom', resteNom.join(' ') || null, date, CONFIANCE_PROFIL_LEAD);
+  ajouter(observations, 'prenom', profil.first_name, date, CONFIANCE_PROFIL_LEAD);
+  ajouter(observations, 'nom', profil.last_name, date, CONFIANCE_PROFIL_LEAD);
   ajouter(observations, 'titre', profil.position, date, CONFIANCE_PROFIL_LEAD);
   ajouter(observations, 'email', profil.email, date, CONFIANCE_PROFIL_LEAD);
   ajouter(observations, 'telephone', profil.phone_number, date, CONFIANCE_PROFIL_LEAD);
+  ajouter(observations, 'linkedin_contact', profil.linkedin_url, date, CONFIANCE_PROFIL_LEAD);
   ajouter(observations, 'localisation_contact', profil.location, date, CONFIANCE_PROFIL_LEAD);
   ajouter(observations, 'date_prise_poste', profil.position_start_date, date, CONFIANCE_PROFIL_LEAD);
 

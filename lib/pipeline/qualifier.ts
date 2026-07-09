@@ -88,7 +88,7 @@ export async function qualifierLead(entree: EntreeQualification): Promise<Result
   const candidats: CandidatIdentite[] = profilsMapping.map((p, i) => ({
     id: `sillage:${i}`,
     source: 'sillage',
-    nom: p.name,
+    nom: [p.first_name, p.last_name].filter(Boolean).join(' ') || null,
     email: p.email,
     domaine: mappingSummary?.company.domain ?? null,
     titre: p.position,
@@ -122,16 +122,15 @@ export async function qualifierLead(entree: EntreeQualification): Promise<Result
   // Les coordonnées arrivent par sondage client (app/api/fullenrich/status) ;
   // elles rejoindront le dossier à la prochaine consolidation.
   let fullenrichEnrichmentId: string | null = null;
-  if (profilPrincipal?.name) {
-    const [firstname, ...reste] = profilPrincipal.name.trim().split(/\s+/);
+  if (profilPrincipal && (profilPrincipal.first_name || profilPrincipal.last_name)) {
     const contacts = construireContactsAEnrichir([
       {
         contactId: 'interlocuteur_principal',
-        firstname: firstname ?? null,
-        lastname: reste.join(' ') || null,
+        firstname: profilPrincipal.first_name,
+        lastname: profilPrincipal.last_name,
         domain: mappingSummary?.company.domain ?? null,
         companyName: mappingSummary?.company.name ?? null,
-        linkedinUrl: null,
+        linkedinUrl: profilPrincipal.linkedin_url,
       },
     ]);
     if (contacts.length > 0) {

@@ -12,10 +12,16 @@ export interface SillageCompanyMappingSummary {
 }
 
 export interface SillageCompanyMappingProfile {
-  name: string | null;
+  id: number;
+  first_name: string | null;
+  last_name: string | null;
   position: string | null;
   position_start_date: string | null;
   linkedin_handle: string | null;
+  linkedin_url: string | null;
+  linkedin_headline: string | null;
+  linkedin_about: string | null;
+  avatar_url: string | null;
   email: string | null;
   phone_number: string | null;
   location: string | null;

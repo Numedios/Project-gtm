@@ -24,10 +24,16 @@ const MAPPING_DETAIL: SillageCompanyMappingDetail = {
   ...MAPPING,
   profiles: [
     {
-      name: 'Marie Durand',
+      id: 90001,
+      first_name: 'Marie',
+      last_name: 'Durand',
       position: 'VP Sales',
       position_start_date: '2026-06-30T00:00:00.000Z',
       linkedin_handle: 'marie-durand-example',
+      linkedin_url: 'https://linkedin.com/in/marie-durand-example',
+      linkedin_headline: 'VP Sales @ Acme Corp',
+      linkedin_about: null,
+      avatar_url: null,
       email: null,
       phone_number: null,
       location: 'Paris, France',
