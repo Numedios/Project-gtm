@@ -9,12 +9,45 @@ que d'être constatées après coup.
 ## Séparation fond / forme
 
 > Même lead, deux profils AE différents ⇒ la partie non personnalisée du dossier (données
-> consolidées, scores, fiche récap, **contenu** des questions) est identique **octet pour octet**.
+> consolidées, scores, fiche récap, **contenu** des questions **et leur ordre**) est identique
+> **octet pour octet**. Seule la **formulation** de chaque question diffère.
 
 Golden test, pas test d'intégration. À écrire **avant** la première ligne de personnalisation.
 C'est ce qui rend concrète l'exigence « livrable auditable et comparable entre AE ».
 
-Voir [01 §1.3](01-incoherences-internes.md#13-la-mémoire-ae-peut-faire-fuiter-du-fond-dans-la-forme).
+L'**ordre** des questions est dans le périmètre du golden test, pas seulement leur contenu :
+réordonner, c'est hiérarchiser, donc influencer le fond perçu. La liste ordonnée est figée en amont
+(décision [01 §1.3](01-incoherences-internes.md#13-la-mémoire-ae-peut-faire-fuiter-du-fond-dans-la-forme--résolue),
+2026-07-09) ; la personnalisation la reçoit et ne peut que **réécrire le texte** de chaque item.
+
+Deux invariants nouvellement testables en découlent.
+
+**(a) Le profil AE est un schéma fermé.** Il ne contient **aucun** champ hors des cinq slots
+stylistiques :
+
+```
+{ registre, longueur, tournure, tutoiement, densite_jargon }   -- ensemble exact des clés admises
+```
+
+Test : tout champ inconnu dans le profil chargé (à commencer par `types de lead`, retiré le
+2026-07-09) doit **lever**, pas être ignoré silencieusement. Chaque slot ne prend qu'une valeur de
+son énumération bornée ; une valeur hors domaine lève également. C'est ce qui neutralise par
+construction le vecteur d'injection n°1
+([03](03-securite-injection-prompt.md#borner-le-profil-ae--décision-arrêtée-le-2026-07-09)).
+
+**(b) La personnalisation est une bijection sur la liste de questions.** Elle réécrit, elle ne
+réordonne, n'ajoute ni ne supprime rien :
+
+```
+len(questions_out) == len(questions_in)                     -- même cardinalité
+[q.id for q in questions_out] == [q.id for q in questions_in]  -- même ordre, mêmes items
+```
+
+Seul le champ **texte** de chaque item change entre l'entrée et la sortie. Test : sur une liste
+d'entrée donnée, la sortie a la même cardinalité et la même séquence d'identifiants ; toute
+divergence d'ordre, tout item ajouté ou retiré, lève.
+
+Voir [01 §1.3](01-incoherences-internes.md#13-la-mémoire-ae-peut-faire-fuiter-du-fond-dans-la-forme--résolue).
 
 ---
 

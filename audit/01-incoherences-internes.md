@@ -1,14 +1,15 @@
 # 01 — Incohérences internes du brief
 
-**Sévérité : bloquant.** Ces trois points ne sont pas des détails d'implémentation. Tant qu'ils ne
-sont pas tranchés, le moteur d'arbitrage n'est pas spécifiable et l'invariant fond/forme n'est pas
-tenable.
+**Sévérité : bloquant.** Ces trois points n'étaient pas des détails d'implémentation : tant qu'ils
+n'étaient pas tranchés, le moteur d'arbitrage n'était pas spécifiable et l'invariant fond/forme
+n'était pas tenable. Les trois sont désormais tranchés (2026-07-09) ; les décisions retenues sont
+consignées ci-dessous.
 
 | # | Sujet | Statut |
 |---|---|---|
 | 1.1 | Le titre du décideur — règle 1 vs exemple du §6 | ✅ **Résolue** (2026-07-09) |
 | 1.2 | `a_signaler_AE` sur un conflit résolu | ✅ **Résolue** (2026-07-09) |
-| 1.3 | La mémoire AE viole son propre invariant | ⬜ Ouverte |
+| 1.3 | La mémoire AE viole son propre invariant | ✅ **Résolue** (2026-07-09) |
 
 ---
 
@@ -199,7 +200,9 @@ fausses questions — exactement le risque produit que ce réglage cherche à é
 
 ---
 
-## 1.3 La mémoire AE peut faire fuiter du fond dans la forme
+## 1.3 La mémoire AE peut faire fuiter du fond dans la forme — ✅ RÉSOLUE
+
+### Le problème constaté
 
 Le §9 pose comme **invariant fort** :
 
@@ -211,25 +214,66 @@ Puis, trois lignes plus haut, il liste le contenu de cette mémoire :
 > *« Tournure/forme préférée des questions, style/ton, **types de lead**. »*
 
 Le **type de lead est un signal de fond**, pas de style. L'invariant et le contenu de la mémoire
-sont incompatibles.
+sont incompatibles : une mémoire qui encode un « type de lead » peut, à terme, faire varier ce que
+l'AE voit — quelles questions, dans quel ordre — d'un AE à l'autre. C'est exactement ce que le §9
+interdit.
 
-### Suggestion
+---
 
-Retirer `types de lead` du contenu de la mémoire, et restreindre le schéma du profil à des slots
-**strictement stylistiques** : registre, longueur, tournure directe/indirecte, tutoiement, densité
-de jargon.
+### Décision retenue (2026-07-09)
 
-Noter que même l'**ordre** des questions est discutable : réordonner, c'est hiérarchiser, donc
-influencer le fond perçu par l'AE. Si l'on veut tenir l'invariant au sens fort, l'ordre est figé en
-amont lui aussi.
+> **Le profil AE est un schéma fermé de slots strictement stylistiques. Il ne porte aucun signal
+> de fond, et il ne peut que réécrire le texte des questions — jamais leur nombre ni leur ordre.**
 
-### Le test qui protège l'invariant
+**`types de lead` est retiré du contenu de la mémoire AE.** C'est un signal de fond, pas de forme ;
+il n'a rien à faire dans un profil censé n'agir que sur le style.
+
+Le profil devient un **schéma fermé** de slots à domaine de valeurs borné, tous stylistiques :
+
+```
+registre        : formel | familier
+longueur        : courte | moyenne | détaillée
+tournure        : directe | indirecte
+tutoiement      : oui | non
+densite_jargon  : faible | moyenne | élevée
+```
+
+**Aucun texte libre ne transite du feedback vers le prompt.** Le feedback de l'AE est *interprété*
+pour mettre à jour ces slots, jamais recopié. Un ensemble de slots stylistiques ne peut
+structurellement pas encoder un « type de lead ».
+
+**L'ordre des questions est figé en amont.** Réordonner, c'est hiérarchiser, donc influencer le
+fond perçu par l'AE — l'ordre est du fond déguisé en forme. La personnalisation reçoit une **liste
+ordonnée** de questions et n'a qu'un seul degré de liberté : réécrire le **texte** de chaque item.
+
+| Ce que la personnalisation peut faire | Ce qu'elle ne peut jamais faire |
+|---|---|
+| Réécrire la formulation d'une question | Réordonner les questions |
+| Ajuster registre, longueur, tournure, tutoiement, jargon | Ajouter une question |
+| — | Supprimer une question |
+| — | Encoder un « type de lead » ou tout autre signal de fond |
+
+**Conséquence sur le brief :** l'invariant du §10 (« livrable auditable et comparable entre AE »)
+est tenu au sens fort. Le §9 est **amendé** : la mention `types de lead` dans le contenu de la
+mémoire est **caduque**.
+
+### Le golden test qui protège l'invariant
 
 À écrire **avant** la première ligne de personnalisation :
 
-> Même lead + deux profils AE différents ⇒ la partie non personnalisée du dossier (données
-> consolidées, scores, fiche récap, **contenu** des questions) doit être **identique octet pour
-> octet**.
+> Même lead + deux profils AE différents ⇒ les données consolidées, les scores, la fiche récap, le
+> **contenu** des questions **et leur ordre** doivent être **identiques octet pour octet**. Seule
+> la **formulation** de chaque question diffère.
 
-C'est un golden test, pas un test d'intégration. Il rend le §10 (« livrable auditable et comparable
-entre AE ») exécutable au lieu d'être une intention.
+C'est un golden test, pas un test d'intégration. En verrouillant à la fois le contenu **et l'ordre**
+des questions, il rend le §10 (« livrable auditable et comparable entre AE ») exécutable au lieu
+d'être une intention. Tout écart d'ordre entre deux profils est un échec de test, pas une variation
+de style tolérée.
+
+### Fichiers impactés
+
+- [03-securite-injection-prompt.md](03-securite-injection-prompt.md#borner-le-profil-ae--décision-arrêtée-le-2026-07-09) — le
+  schéma fermé du profil AE (slots stylistiques, domaines de valeurs bornés, aucun texte libre) y
+  est spécifié sous « Borner le profil AE ».
+- [08-invariants-a-verifier.md](08-invariants-a-verifier.md#séparation-fond--forme) — le golden
+  test « octet pour octet », étendu à l'ordre figé des questions, sous « Séparation fond / forme ».

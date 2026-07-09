@@ -12,16 +12,17 @@ ne tiennent pas.
 
 ## Verdict en une phrase
 
-La thèse produit est bonne et doit être préservée ; deux contradictions internes rendent le moteur
-d'arbitrage non spécifiable en l'état, et trois formules centrales n'existent pas.
+La thèse produit est bonne et doit être préservée ; les contradictions internes qui rendaient le
+moteur d'arbitrage non spécifiable sont tranchées, mais trois formules centrales n'existent toujours
+pas.
 
 ## Index
 
 | Fichier | Contenu | Sévérité |
 |---|---|---|
-| [01-incoherences-internes.md](01-incoherences-internes.md) | Le brief se contredit sur l'arbitrage et sur l'invariant fond/forme — **2 des 3 résolues** | **Bloquant** |
+| [01-incoherences-internes.md](01-incoherences-internes.md) | Le brief se contredit sur l'arbitrage et sur l'invariant fond/forme — **3 des 3 résolues** | **Bloquant — résolu** |
 | [02-trous-de-specification.md](02-trous-de-specification.md) | Formules absentes, résolution d'entités, branchement CRM, sujets non traités | Élevée |
-| [03-securite-injection-prompt.md](03-securite-injection-prompt.md) | Trois entrées de texte libre alimentent des prompts sans délimitation | Élevée |
+| [03-securite-injection-prompt.md](03-securite-injection-prompt.md) | Trois entrées de texte libre alimentent des prompts sans délimitation — **le feedback AE est neutralisé par construction ; 2 restent ouvertes** | Élevée |
 | [04-architecture-collecteurs.md](04-architecture-collecteurs.md) | Les collecteurs ne sont pas des agents ; conséquences sur le §11 | Structurante |
 | [05-connecteurs.md](05-connecteurs.md) | Sillage via MCP (risque), FullEnriched, CRM mocké (opportunité) | Élevée |
 | [06-strategie-de-repli.md](06-strategie-de-repli.md) | Le §12 sacrifie la mauvaise branche | Moyenne |
@@ -50,9 +51,11 @@ d'arbitrage non spécifiable en l'état, et trois formules centrales n'existent 
 | Sillage | Clé API disponible ; accès REST ou MCP à trancher (voir [05](05-connecteurs.md)) |
 | FullEnriched | Clé API disponible |
 | CRM | **Mocké** |
+| **Mémoire AE** | Le profil AE est un **schéma fermé de slots strictement stylistiques** (`registre`, `longueur`, `tournure`, `tutoiement`, `densite_jargon`) ; `types de lead` est retiré (c'est du fond). **L'ordre des questions est figé en amont** : la personnalisation ne peut que réécrire le texte de chaque question, jamais les réordonner, ajouter ni supprimer. L'invariant du §10 est donc tenu au sens fort. Voir [01 §1.3](01-incoherences-internes.md#13-la-mémoire-ae-peut-faire-fuiter-du-fond-dans-la-forme--résolue). |
 
-**Reste à trancher :** [1.3](01-incoherences-internes.md#13-la-mémoire-ae-peut-faire-fuiter-du-fond-dans-la-forme)
-(mémoire AE).
+Les trois incohérences **bloquantes** du fichier 01 sont désormais tranchées. La seule dépendance
+restante est la séquence de l'**ordre de travail** ([07](07-ordre-de-travail.md)), elle-même bloquée
+à l'étape 0 par l'absence des credentials Sillage / FullEnriched dans l'environnement.
 
 Conséquence développée dans [04-architecture-collecteurs.md](04-architecture-collecteurs.md) :
 il ne reste **aucune boucle agentique** dans le système.
