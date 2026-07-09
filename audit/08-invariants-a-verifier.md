@@ -17,7 +17,7 @@ C'est ce qui rend concrète l'exigence « livrable auditable et comparable entre
 
 L'**ordre** des questions est dans le périmètre du golden test, pas seulement leur contenu :
 réordonner, c'est hiérarchiser, donc influencer le fond perçu. La liste ordonnée est figée en amont
-(décision [01 §1.3](01-incoherences-internes.md#13-la-mémoire-ae-peut-faire-fuiter-du-fond-dans-la-forme--résolue),
+(décision [01 §1.3](01-incoherences-internes.md#13-la-mémoire-ae-peut-faire-fuiter-du-fond-dans-la-forme---résolue),
 2026-07-09) ; la personnalisation la reçoit et ne peut que **réécrire le texte** de chaque item.
 
 Deux invariants nouvellement testables en découlent.
@@ -47,7 +47,7 @@ Seul le champ **texte** de chaque item change entre l'entrée et la sortie. Test
 d'entrée donnée, la sortie a la même cardinalité et la même séquence d'identifiants ; toute
 divergence d'ordre, tout item ajouté ou retiré, lève.
 
-Voir [01 §1.3](01-incoherences-internes.md#13-la-mémoire-ae-peut-faire-fuiter-du-fond-dans-la-forme--résolue).
+Voir [01 §1.3](01-incoherences-internes.md#13-la-mémoire-ae-peut-faire-fuiter-du-fond-dans-la-forme---résolue).
 
 ---
 
@@ -66,7 +66,7 @@ l'invariant est garanti par le type.
 > Mêmes entrées estampillées ⇒ mêmes valeurs retenues, mêmes conflits, mêmes signaux.
 
 L'arbitrage repose sur **une seule règle — la récence** — et sur le marqueur `stable | volatile`
-de chaque champ (voir [01 §1.1](01-incoherences-internes.md#11-lexemple-du-6-contredit-la-règle-darbitrage-n1--résolue)).
+de chaque champ (voir [01 §1.1](01-incoherences-internes.md#11-lexemple-du-6-contredit-la-règle-darbitrage-n1---résolue)).
 Tests unitaires **table-driven** sur la table de décision, incluant les cas limites :
 
 - **champ volatile divergent** ⇒ signal « changement détecté », **aucun** conflit, **aucune**
@@ -89,7 +89,7 @@ resolution == "impossible"  &&  a_signaler_AE == false     -- ne doit jamais se 
 
 Un conflit qu'on n'a pas su trancher est toujours signalé. C'est la quatrième ligne du tableau
 `resolution × a_signaler_AE`
-([01 §1.2](01-incoherences-internes.md#12-a_signaler_ae-na-pas-de-règle-de-déclenchement--résolue)).
+([01 §1.2](01-incoherences-internes.md#12-a_signaler_ae-na-pas-de-règle-de-déclenchement---résolue)).
 
 Les trois autres lignes sont des cas de test nominaux :
 

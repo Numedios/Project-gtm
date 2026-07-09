@@ -8,7 +8,7 @@ arbitraire du modèle de génération de code s'il n'est pas tranché avant.
 ## 2.0 Le schéma canonique doit porter un marqueur `stable | volatile`
 
 Conséquence de la résolution de l'incohérence n°1
-([01 §1.1](01-incoherences-internes.md#11-lexemple-du-6-contredit-la-règle-darbitrage-n1--résolue)).
+([01 §1.1](01-incoherences-internes.md#11-lexemple-du-6-contredit-la-règle-darbitrage-n1---résolue)).
 
 La règle d'arbitrage est unique — **la récence prime** — mais ce qu'on *émet* dépend de la nature
 du champ :
@@ -59,7 +59,7 @@ concordent — et le §10 exige un livrable auditable.
 ### Deux seuils à spécifier également
 
 Conséquence de la résolution de l'incohérence n°2
-([01 §1.2](01-incoherences-internes.md#12-a_signaler_ae-na-pas-de-règle-de-déclenchement--résolue)) :
+([01 §1.2](01-incoherences-internes.md#12-a_signaler_ae-na-pas-de-règle-de-déclenchement---résolue)) :
 
 ```
 a_signaler_AE = (resolution == "impossible")

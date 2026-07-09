@@ -45,7 +45,7 @@ Le §9 dit *« profil de préférence résumé en texte (léger) »*. Un profil 
 à chaque feedback **dérive** et devient impossible à auditer : on ne sait plus quel feedback a
 produit quel comportement.
 
-La résolution de [01 §1.3](01-incoherences-internes.md#13-la-mémoire-ae-peut-faire-fuiter-du-fond-dans-la-forme--résolue)
+La résolution de [01 §1.3](01-incoherences-internes.md#13-la-mémoire-ae-peut-faire-fuiter-du-fond-dans-la-forme---résolue)
 (2026-07-09) **arrête** ce qui n'était ici qu'une esquisse. Le profil AE devient un **schéma fermé**
 de slots strictement stylistiques, rendus en texte au moment de construire le prompt. On garde la
 légèreté annoncée sans perdre la bornabilité :

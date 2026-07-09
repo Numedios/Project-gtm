@@ -79,7 +79,7 @@ Ce n'est pas un bouchon à remplir de données plausibles : **c'est le jeu de te
 réconciliation.** Il doit contenir, délibérément, exactement les cas que le §6 prétend gérer.
 
 Les fixtures ci-dessous exercent la table de décision arrêtée en
-[01 §1.1](01-incoherences-internes.md#11-lexemple-du-6-contredit-la-règle-darbitrage-n1--résolue) :
+[01 §1.1](01-incoherences-internes.md#11-lexemple-du-6-contredit-la-règle-darbitrage-n1---résolue) :
 règle d'arbitrage unique (récence), sortie déterminée par le marqueur `stable | volatile`.
 
 | # | Fixture | Ce qu'elle teste | Sortie attendue |
@@ -103,7 +103,7 @@ entrer en conflit. C'est précisément l'observation qui a rendu la règle 1 du 
 
 Les **n°2 et n°3** sont la même divergence avec deux réglages de `SEUIL_ECART`. Ensemble, elles
 couvrent les deux lignes `auto` du tableau `resolution × a_signaler_AE`
-([01 §1.2](01-incoherences-internes.md#12-a_signaler_ae-na-pas-de-règle-de-déclenchement--résolue)) et
+([01 §1.2](01-incoherences-internes.md#12-a_signaler_ae-na-pas-de-règle-de-déclenchement---résolue)) et
 prouvent que le seuil est bien un paramètre, pas une constante enfouie dans le code.
 
 Écrire ces onze fixtures **avant** le moteur d'arbitrage transforme le §6 d'un paragraphe de prose
