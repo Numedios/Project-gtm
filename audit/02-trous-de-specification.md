@@ -5,6 +5,31 @@ arbitraire du modèle de génération de code s'il n'est pas tranché avant.
 
 ---
 
+## 2.0 Le schéma canonique doit porter un marqueur `stable | volatile`
+
+Conséquence de la résolution de l'incohérence n°1
+([01 §1.1](01-incoherences-internes.md#11-lexemple-du-6-contredit-la-règle-darbitrage-n1--résolue)).
+
+La règle d'arbitrage est unique — **la récence prime** — mais ce qu'on *émet* dépend de la nature
+du champ :
+
+- champ **volatile** (`titre`, `seniorite`, `effectif`) : une divergence est un **changement**, pas
+  une erreur. Signal d'achat, pas conflit, pas de question à l'AE ;
+- champ **stable** (`pays_siege`, `nom` légal) : une divergence signifie qu'une source **se
+  trompe**. Vrai conflit, question à l'AE.
+
+Chaque champ du schéma du §6 doit donc porter ce marqueur. C'est une passe de spécification
+d'environ trente champs, relue par le métier. Elle **remplace** la table
+`champ → classe d'autorité` que suggérait la version initiale de cet audit : la règle 1 du brief
+étant caduque, il n'y a plus de classe d'autorité à définir.
+
+**Corollaire sur la structure du jeu de données consolidé :** l'union **ne doit pas écraser**.
+Conserver toutes les observations estampillées (source, valeur, date, confiance) et *dériver* la
+valeur retenue. Deux sources qui donnent la même valeur ne forment pas un doublon à dédupliquer :
+c'est une **corroboration**, et elle doit remonter dans le calcul de confiance (voir §2.1).
+
+---
+
 ## 2.1 Aucune formule pour les deux scores ni pour la confiance
 
 Le brief manipule trois quantités numériques sans jamais dire comment les calculer.
@@ -31,6 +56,25 @@ Le LLM ne calcule ni n'ajuste jamais le score : il **met la décomposition en pr
 le modèle produire le chiffre et la justification ensemble, rien ne garantit que les deux
 concordent — et le §10 exige un livrable auditable.
 
+### Deux seuils à spécifier également
+
+Conséquence de la résolution de l'incohérence n°2
+([01 §1.2](01-incoherences-internes.md#12-a_signaler_ae-na-pas-de-règle-de-déclenchement--résolue)) :
+
+```
+a_signaler_AE = (resolution == "impossible")
+             OR (age(valeur_retenue) > SEUIL_AGE)
+             OR (ecart_jours         > SEUIL_ECART)
+```
+
+Ces deux seuils sont **paramétrés par classe de champ, jamais globalement**. Les champs volatiles
+n'émettant plus de conflits, ils ne s'appliquent qu'aux champs **stables**, où le défaut prudent
+est `SEUIL_ECART = 0` — toute divergence est signalée, puisqu'elle révèle une erreur de source et
+non une évolution de la donnée.
+
+Ce sont les deux paramètres qui **déterminent le volume de questions reçues par l'AE**. Ils doivent
+être calibrés sur des données réelles, pas devinés.
+
 ---
 
 ## 2.2 La résolution d'entités est le point dur, et n'est pas spécifiée
@@ -39,20 +83,26 @@ Rapprocher les entités à travers Sillage, FullEnriched et le CRM — **sans we
 (contrainte ferme du §2) — est le cœur de difficulté de la réconciliation. Le brief y consacre une
 demi-ligne : *« (1) rapproche les entités »*.
 
-### Suggestion : deux étages
+### Suggestion : deux étages, dont le second est un motif proposeur / vérificateur
 
 1. **Blocage déterministe** sur clé normalisée. Email normalisé en priorité, puis
-   `nom + domaine entreprise`. Résout la grande majorité des cas, sans LLM, donc reproductible.
-2. **LLM en départage uniquement**, sur l'ensemble **borné** de paires ambiguës que l'étage 1 n'a
-   pas résolues. Chaque décision est journalisée avec son entrée exacte (donc rejouable) et mise en
-   cache.
+   `nom + domaine entreprise`. Résout l'écrasante majorité des cas, sans LLM, donc reproductible.
+2. **Départage LLM en motif proposeur / vérificateur**, sur l'ensemble **borné** de paires
+   ambiguës que l'étage 1 n'a pas su trancher. Un premier appel — le **proposeur** — propose une
+   décision assortie de sa justification. Un second appel — le **vérificateur** — s'exécute dans un
+   **contexte frais**, reçoit la proposition et les estampilles de provenance, puis la conteste ou
+   la valide. Un vérificateur en contexte séparé attrape des erreurs qu'une simple auto-critique ne
+   voit pas. Ce sont **deux appels one-shot chaînés**, pas une boucle agentique. Chaque décision —
+   proposition comme vérification — est journalisée avec son entrée exacte (donc rejouable) et mise
+   en cache. Le détail du motif est développé dans [04](04-architecture-collecteurs.md).
 
 Cette structure préserve l'exigence de déterminisme du §10 **au niveau du chemin de code** : le
 LLM n'est jamais sur le chemin nominal, seulement sur les cas résiduels, et ses décisions sont
-traçables.
+tracées et rejouables à l'identique. À entrée identique, sortie identique.
 
 Le même schéma vaut pour l'équivalence sémantique de titres (« VP Sales » ≡ « Head of Sales ») :
-table de synonymes d'abord, LLM en repli.
+table de synonymes d'abord, proposeur / vérificateur seulement en repli, sur les titres que la
+table ne couvre pas.
 
 ---
 

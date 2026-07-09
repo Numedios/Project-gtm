@@ -22,11 +22,16 @@ variables d'environnement).
 | 1 | **Sonder Sillage** ([05 §5.1](05-connecteurs.md#51-sillage-via-mcp--le-risque-à-vérifier-en-premier)). REST disponible ? Sinon `list_tools()` sur le MCP : réponses structurées ou en prose ? | 0 |
 | 2 | **Sonder FullEnriched** ([05 §5.2](05-connecteurs.md#52-fullenriched)). Quels champs, quelles métadonnées de fraîcheur ? | 0 |
 | 3 | **Écrire le schéma canonique réel**, champ par champ | 1, 2 — **sauf** les champs CRM |
-| 4 | **Écrire la table `champ → classe d'autorité`** ([01 §1.1](01-incoherences-internes.md#11-lexemple-du-6-contredit-la-règle-darbitrage-n1)). Relue par un humain métier | 3 |
+| 4 | **Marquer chaque champ `stable` ou `volatile`** ([02 §2.0](02-trous-de-specification.md#20-le-schéma-canonique-doit-porter-un-marqueur-stable--volatile)). Relu par un humain métier. ~30 champs | 3 |
 | 5 | **Écrire les règles de seuil** : tolérance par champ, `ecart_jours` déclenchant `a_signaler_AE`, seuil de confiance | 4 |
-| 6 | **Écrire les trois formules** : confiance, complétude, ICP ([02 §2.1](02-trous-de-specification.md#21-aucune-formule-pour-les-deux-scores-ni-pour-la-confiance)) | 4 |
-| 7 | **Écrire les sept fixtures CRM** de conflit ([05 §5.3](05-connecteurs.md#53-le-crm-mocké-est-une-opportunité-de-design-pas-une-corvée)) | 5, 6 |
+| 6 | **Écrire les trois formules** : confiance (incluant la corroboration), complétude, ICP ([02 §2.1](02-trous-de-specification.md#21-aucune-formule-pour-les-deux-scores-ni-pour-la-confiance)) | 4 |
+| 7 | **Écrire les onze fixtures CRM** ([05 §5.3](05-connecteurs.md#53-le-crm-mocké-est-une-opportunité-de-design-pas-une-corvée)) | 5, 6 |
 | 8 | **Rédiger le prompt de génération de code** (§13 du brief) | 7 |
+
+> L'étape 4 était initialement « écrire la table `champ → classe d'autorité` ». La résolution de
+> l'incohérence n°1 l'a rendue caduque : la règle 1 du brief protégeait un ensemble vide, il n'y a
+> plus de classe d'autorité à définir. Le marqueur `stable | volatile` la remplace — même ordre de
+> travail, mais il sert à décider **quoi montrer à l'AE**, pas **qui gagne**.
 
 L'étape 1 décide de l'architecture du connecteur Sillage et conditionne la tenue de l'invariant de
 déterminisme. **Aucune ligne de code produit ne devrait être écrite avant.**

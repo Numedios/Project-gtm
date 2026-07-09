@@ -78,17 +78,35 @@ cette promesse.
 Ce n'est pas un bouchon à remplir de données plausibles : **c'est le jeu de tests de la
 réconciliation.** Il doit contenir, délibérément, exactement les cas que le §6 prétend gérer.
 
-| # | Fixture | Ce qu'elle teste |
-|---|---|---|
-| 1 | Titre périmé divergeant de Sillage | Règle 2 (récence) |
-| 2 | Historique relationnel contredit par Sillage | Règle 1 — le CRM doit gagner |
-| 3 | Effectif différant de 6 % | Règle 3 — ce n'est **pas** un conflit |
-| 4 | Champ **sans date** | Règle 4 — pas de résolution auto → question à l'AE |
-| 5 | Décideur ayant fait un deal dans une **autre** entreprise | Cas d'usage explicite du §5 |
-| 6 | Compte qui matche **deux fois** | Ambiguïté du branchement ([02 §2.3](02-trous-de-specification.md#23-le-critère--lead-déjà-présent-dans-le-crm--nest-pas-défini)) |
-| 7 | Lead **absent** | Branche NOUVEAU LEAD du §7 |
+Les fixtures ci-dessous exercent la table de décision arrêtée en
+[01 §1.1](01-incoherences-internes.md#11-lexemple-du-6-contredit-la-règle-darbitrage-n1--résolue) :
+règle d'arbitrage unique (récence), sortie déterminée par le marqueur `stable | volatile`.
 
-Écrire ces sept fixtures **avant** le moteur d'arbitrage transforme le §6 d'un paragraphe de prose
+| # | Fixture | Ce qu'elle teste | Sortie attendue |
+|---|---|---|---|
+| 1 | Titre périmé divergeant de Sillage | Champ **volatile** | **Signal** « changement de décisionnaire », **aucune** question |
+| 2 | `pays_siege` divergent, deux sources fraîches, `SEUIL_ECART = 0` | Champ **stable**, `resolution: auto` + **signalé** | **Conflit** → question de **confirmation** |
+| 3 | `pays_siege` divergent, `SEUIL_ECART` relevé | Champ **stable**, `resolution: auto` + **non signalé** | Valeur retenue **en silence**, aucun conflit. Teste que le bouton de réglage fonctionne |
+| 4 | Valeur retenue elle-même périmée (`age > SEUIL_AGE`) | Angle mort du brief : les **deux** sources sont vieilles | **Conflit** → question de confirmation |
+| 5 | Effectif différant de 6 % | Tolérance (règle 3) | Ni conflit ni signal |
+| 6 | Champ **sans date** | Règle 4 → `resolution: impossible` | **Conflit** → question **ouverte** |
+| 7 | Deux sources donnant la **même valeur** | Corroboration | Aucun conflit, **confiance rehaussée** |
+| 8 | Deux sources, **même date**, valeurs divergentes | Départage par `confiance_source` | Conflit si les confiances sont égales |
+| 9 | Décideur ayant fait un deal dans une **autre** entreprise | Cas d'usage explicite du §5 | Historique relationnel remonté, aucun conflit |
+| 10 | Compte qui matche **deux fois** | Ambiguïté du branchement ([02 §2.3](02-trous-de-specification.md#23-le-critère--lead-déjà-présent-dans-le-crm--nest-pas-défini)) | NOUVEAU LEAD + conflit signalé |
+| 11 | Lead **absent** | Branche du §7 | Dossier NOUVEAU LEAD |
+
+Deux fixtures méritent un commentaire.
+
+La **n°9** : l'historique relationnel n'ayant **qu'une seule source** (le CRM), il ne peut jamais
+entrer en conflit. C'est précisément l'observation qui a rendu la règle 1 du brief caduque.
+
+Les **n°2 et n°3** sont la même divergence avec deux réglages de `SEUIL_ECART`. Ensemble, elles
+couvrent les deux lignes `auto` du tableau `resolution × a_signaler_AE`
+([01 §1.2](01-incoherences-internes.md#12-a_signaler_ae-na-pas-de-règle-de-déclenchement--résolue)) et
+prouvent que le seuil est bien un paramètre, pas une constante enfouie dans le code.
+
+Écrire ces onze fixtures **avant** le moteur d'arbitrage transforme le §6 d'un paragraphe de prose
 en une spécification exécutable.
 
 ### 3. Le mock fige le schéma canonique côté CRM
