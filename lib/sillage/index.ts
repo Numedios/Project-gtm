@@ -6,6 +6,7 @@ export type { SillageClient } from './client';
 export { SillageClientError } from './client';
 export * from './types';
 export * from './normalize';
+export * from './signaux';
 
 let instance: SillageClient | null = null;
 

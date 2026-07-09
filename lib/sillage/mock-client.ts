@@ -94,6 +94,25 @@ const LEAD: SillageLead = {
   ],
 };
 
+// Entreprise AVEC signaux mais SANS company mapping — le chemin « signaux
+// malgré mapping absent » (résolution inverse company_id → domaine, voir
+// signaux.ts). Recoupe la fixture n°11 : neuve.ai, absente aussi du CRM.
+const COMPANY_SANS_MAPPING_ID = 990;
+
+const COMPANY_SANS_MAPPING: SillageCompanyEnrichment = {
+  name: 'Neuve AI',
+  domain: 'neuve.ai',
+  url: 'https://neuve.ai',
+  linkedin_url: 'https://linkedin.com/company/neuve-ai-example',
+  location: 'Lyon, France',
+  locations: [{ is_hq: true, city: 'Lyon', region: 'Auvergne-Rhône-Alpes', country: 'France', country_code: 'FR' }],
+  number_of_employees: 25,
+  employee_range: '11-50',
+  founded_year: 2024,
+  industries: 'Intelligence artificielle',
+  activity_summary: 'Studio IA — agents pour équipes commerciales.',
+};
+
 const SIGNALS: SillageSignalDetection[] = [
   {
     id: 500001,
@@ -117,6 +136,19 @@ const SIGNALS: SillageSignalDetection[] = [
     source_url: 'https://acme-corp.example/careers',
     excerpt: '4 postes commerciaux ouverts en France.',
   },
+  {
+    // Signal d'une entreprise SANS mapping — n'apparaît que via la résolution
+    // inverse company_id → domaine (signaux.ts).
+    id: 500003,
+    signal_type: 'fundraising',
+    detected_at: '2026-07-02T09:00:00.000Z',
+    signal_date: '2026-07-01T00:00:00.000Z',
+    lead_id: null,
+    company_id: COMPANY_SANS_MAPPING_ID,
+    agent_id: 3,
+    source_url: 'https://presse.example/neuve-ai-seed',
+    excerpt: 'Neuve AI lève 3 M€ en seed pour ses agents commerciaux.',
+  },
 ];
 
 export class SillageMockClient implements SillageClient {
@@ -130,7 +162,9 @@ export class SillageMockClient implements SillageClient {
   }
 
   async getCompany(companyId: number): Promise<SillageCompanyEnrichment | null> {
-    return companyId === MAPPING.company.id ? COMPANY : null;
+    if (companyId === MAPPING.company.id) return COMPANY;
+    if (companyId === COMPANY_SANS_MAPPING_ID) return COMPANY_SANS_MAPPING;
+    return null;
   }
 
   async getLead(leadId: number): Promise<SillageLead | null> {

@@ -8,6 +8,7 @@ import {
   normaliserSignauxAchat,
   type ObservationsParChamp,
 } from '@/lib/sillage/normalize';
+import { signauxPourDomaine } from '@/lib/sillage/signaux';
 import { construireContactsAEnrichir, normaliserResultatBulk } from '@/lib/fullenrich/waterfall';
 import { getFullEnrichClient } from '@/lib/fullenrich';
 import { blocageDeterministe, resoudrePaireAmbigue, type CandidatIdentite } from '@/lib/llm/reconciliation';
@@ -66,7 +67,17 @@ export async function qualifierLead(entree: EntreeQualification): Promise<Result
     trouve: !!mappingSummary,
   });
 
-  const [mappingDetail, company, signauxBruts] = mappingSummary
+  // Les signaux ne dépendent PAS du mapping : les scores ICP et de complétude
+  // en ont besoin même quand l'account mapping n'existe pas. Sans mapping,
+  // signauxPourDomaine résout company_id → domaine via get_company.
+  const signauxPromise = signauxPourDomaine(sillage, entree.domaine, mappingSummary?.company.id ?? null).catch(
+    (err) => {
+      marquerIndisponible('sillage', 'collecte.sillage.signaux', err);
+      return [];
+    },
+  );
+
+  const [mappingDetail, company] = mappingSummary
     ? await Promise.all([
         sillage.getCompanyMapping(mappingSummary.id).catch((err) => {
           marquerIndisponible('sillage', 'collecte.sillage.mapping_detail', err);
@@ -76,12 +87,15 @@ export async function qualifierLead(entree: EntreeQualification): Promise<Result
           marquerIndisponible('sillage', 'collecte.sillage.company', err);
           return null;
         }),
-        sillage.listRecentSignals({ companyId: mappingSummary.company.id }).catch((err) => {
-          marquerIndisponible('sillage', 'collecte.sillage.signaux', err);
-          return [];
-        }),
       ])
-    : [null, null, []];
+    : [null, null];
+
+  const signauxBruts = await signauxPromise;
+  pousserTrace('collecte.sillage.signaux', 'appel_outil', {
+    outil: 'list_signals',
+    signaux: signauxBruts.length,
+    via_mapping: !!mappingSummary,
+  });
 
   // --- Résolution d'identités sur les profils du mapping (B4, étage 1 + 2) ---
   // Le schéma A1 modélise UN interlocuteur par dossier : on déduplique les
