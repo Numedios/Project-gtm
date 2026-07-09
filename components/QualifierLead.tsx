@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { DossierConsolide } from '@/lib/schema/canonical';
 import type { TraceEvent } from '@/lib/pipeline/trace';
 import { DossierView } from './DossierView';
@@ -11,11 +11,37 @@ import { DossierView } from './DossierView';
 // et le contrat casse ici, pas en silence. Les questions personnalisées (B6)
 // remplacent les questions d'origine AVANT le parse — la bijection ayant déjà
 // été validée par le moteur, le dossier reste conforme au contrat.
+//
+// Boucle FullEnrich (B3) : le premier passage rend le dossier sans attendre le
+// waterfall ; c'est ICI que le sondage se rythme (jamais un sleep serveur,
+// contrainte Vercel — voir app/api/fullenrich/status). Quand le lot est prêt,
+// on re-qualifie avec l'enrichment_id : les coordonnées entrent dans la
+// consolidation comme n'importe quelle source et le dossier affiché est
+// remplacé entier — jamais de patch local d'un champ.
 
 interface EtatResultat {
   dossier: DossierConsolide;
   proseIcp: string | null;
   trace: TraceEvent[];
+}
+
+type StatutFullenrich = 'en_cours' | 'integre' | 'echec' | null;
+
+const INTERVALLE_SONDAGE_MS = 4000;
+const MAX_SONDAGES = 20;
+
+function parserResultat(json: {
+  dossier: unknown;
+  questions_personnalisees?: unknown;
+  prose_icp?: string | null;
+  trace?: TraceEvent[];
+}): EtatResultat {
+  const brut = json.dossier as { questions: unknown };
+  const dossier = DossierConsolide.parse({
+    ...(json.dossier as Record<string, unknown>),
+    questions: json.questions_personnalisees ?? brut.questions,
+  });
+  return { dossier, proseIcp: json.prose_icp ?? null, trace: json.trace ?? [] };
 }
 
 export function QualifierLead() {
@@ -25,38 +51,84 @@ export function QualifierLead() {
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [resultat, setResultat] = useState<EtatResultat | null>(null);
+  const [statutFullenrich, setStatutFullenrich] = useState<StatutFullenrich>(null);
+
+  // Chaque soumission invalide les sondages de la précédente.
+  const runRef = useRef(0);
+
+  async function appelerQualify(corps: Record<string, string>): Promise<{
+    etat: EtatResultat;
+    fullenrichId: string | null;
+  }> {
+    const reponse = await fetch('/api/qualify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(corps),
+    });
+    const json = await reponse.json();
+    if (!reponse.ok) {
+      throw new Error(typeof json?.error === 'string' ? json.error : `Requête rejetée (${reponse.status})`);
+    }
+    return { etat: parserResultat(json), fullenrichId: json.fullenrich_enrichment_id ?? null };
+  }
+
+  async function suivreEnrichissement(enrichmentId: string, corpsInitial: Record<string, string>, run: number) {
+    for (let tentative = 0; tentative < MAX_SONDAGES && runRef.current === run; tentative++) {
+      try {
+        const reponse = await fetch(`/api/fullenrich/status?enrichment_id=${encodeURIComponent(enrichmentId)}`);
+        const json = await reponse.json();
+        if (!reponse.ok) throw new Error(typeof json?.error === 'string' ? json.error : 'statut FullEnrich illisible');
+
+        if (json.status === 'FAILED') {
+          if (runRef.current === run) setStatutFullenrich('echec');
+          return;
+        }
+
+        if (json.status === 'FINISHED') {
+          const { etat } = await appelerQualify({ ...corpsInitial, fullenrich_enrichment_id: enrichmentId });
+          if (runRef.current !== run) return;
+          setResultat(etat);
+          setStatutFullenrich('integre');
+          return;
+        }
+      } catch {
+        if (runRef.current === run) setStatutFullenrich('echec');
+        return;
+      }
+      await new Promise((r) => setTimeout(r, INTERVALLE_SONDAGE_MS));
+    }
+    // Toujours pas prêt après MAX_SONDAGES : on arrête d'espérer, le dossier
+    // affiché reste valable sans les coordonnées.
+    if (runRef.current === run) setStatutFullenrich('echec');
+  }
 
   async function soumettre(e: FormEvent) {
     e.preventDefault();
+    const run = ++runRef.current;
     setEnCours(true);
     setErreur(null);
+    setStatutFullenrich(null);
+
+    const corps: Record<string, string> = {
+      domaine: domaine.trim(),
+      ...(email.trim() ? { email_contact: email.trim() } : {}),
+      ae_id: aeId.trim(),
+    };
 
     try {
-      const reponse = await fetch('/api/qualify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          domaine: domaine.trim(),
-          ...(email.trim() ? { email_contact: email.trim() } : {}),
-          ae_id: aeId.trim(),
-        }),
-      });
-
-      const json = await reponse.json();
-      if (!reponse.ok) {
-        throw new Error(typeof json?.error === 'string' ? json.error : `Requête rejetée (${reponse.status})`);
+      const { etat, fullenrichId } = await appelerQualify(corps);
+      if (runRef.current !== run) return;
+      setResultat(etat);
+      if (fullenrichId) {
+        setStatutFullenrich('en_cours');
+        void suivreEnrichissement(fullenrichId, corps, run);
       }
-
-      const dossier = DossierConsolide.parse({
-        ...json.dossier,
-        questions: json.questions_personnalisees ?? json.dossier.questions,
-      });
-      setResultat({ dossier, proseIcp: json.prose_icp ?? null, trace: json.trace ?? [] });
     } catch (err) {
+      if (runRef.current !== run) return;
       setErreur(err instanceof Error ? err.message : 'Erreur inconnue');
       setResultat(null);
     } finally {
-      setEnCours(false);
+      if (runRef.current === run) setEnCours(false);
     }
   }
 
@@ -104,6 +176,20 @@ export function QualifierLead() {
           <div className="panel" style={{ borderColor: 'var(--danger)' }}>
             <span className="badge badge-danger">Erreur</span>
             <div style={{ marginTop: 8 }}>{erreur}</div>
+          </div>
+        )}
+
+        {statutFullenrich && (
+          <div className="panel" style={{ padding: '10px 20px' }}>
+            {statutFullenrich === 'en_cours' && (
+              <span className="badge badge-warn">Coordonnées : waterfall FullEnrich en cours…</span>
+            )}
+            {statutFullenrich === 'integre' && (
+              <span className="badge badge-ok">Coordonnées FullEnrich intégrées au dossier</span>
+            )}
+            {statutFullenrich === 'echec' && (
+              <span className="badge badge-danger">FullEnrich indisponible — dossier rendu sans les coordonnées</span>
+            )}
           </div>
         )}
       </main>

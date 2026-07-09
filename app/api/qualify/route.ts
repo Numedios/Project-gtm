@@ -6,6 +6,9 @@ const CorpsRequete = z.object({
   domaine: z.string().min(1),
   email_contact: z.string().email().optional(),
   ae_id: z.string().min(1),
+  // Second passage de la boucle FullEnrich (B3) : re-consolider avec les
+  // coordonnées du waterfall lancé au premier passage.
+  fullenrich_enrichment_id: z.string().min(1).optional(),
 });
 
 // Le pipeline lui-même : quelques dizaines de lignes de câblage, voir
@@ -23,6 +26,7 @@ export async function POST(req: NextRequest) {
       domaine: parseResult.data.domaine,
       emailContact: parseResult.data.email_contact,
       aeId: parseResult.data.ae_id,
+      fullenrichEnrichmentId: parseResult.data.fullenrich_enrichment_id,
     });
     return NextResponse.json(resultat);
   } catch (err) {

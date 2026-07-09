@@ -8,7 +8,7 @@ import {
   normaliserSignauxAchat,
   type ObservationsParChamp,
 } from '@/lib/sillage/normalize';
-import { construireContactsAEnrichir } from '@/lib/fullenrich/waterfall';
+import { construireContactsAEnrichir, normaliserResultatBulk } from '@/lib/fullenrich/waterfall';
 import { getFullEnrichClient } from '@/lib/fullenrich';
 import { blocageDeterministe, resoudrePaireAmbigue, type CandidatIdentite } from '@/lib/llm/reconciliation';
 import { mettreEnProseDecompositionIcp } from '@/lib/llm/scoring-prose';
@@ -26,6 +26,9 @@ export interface EntreeQualification {
   domaine: string;
   emailContact?: string | undefined;
   aeId: string;
+  // Second passage de la boucle B3 : le waterfall lancé au premier passage
+  // est prêt, on récupère ses coordonnées au lieu d'en lancer un nouveau.
+  fullenrichEnrichmentId?: string | undefined;
 }
 
 export type { TraceEvent } from './trace';
@@ -111,18 +114,31 @@ export async function qualifierLead(entree: EntreeQualification): Promise<Result
     profilsDedupliques[0] ||
     null;
 
-  // --- Observations externes, clés NomChamp du schéma A1 ---
-  const observationsExternes: ObservationsParChamp = fusionnerObservations(
-    mappingSummary ? normaliserEntreprise(mappingSummary, company) : {},
-    profilPrincipal ? normaliserProfilMapping(profilPrincipal, mappingSummary?.request_date ?? null) : {},
-    normaliserSignauxAchat(signauxBruts),
-  );
-
-  // --- FullEnrich : on LANCE le waterfall, on ne bloque jamais dessus (B3).
-  // Les coordonnées arrivent par sondage client (app/api/fullenrich/status) ;
-  // elles rejoindront le dossier à la prochaine consolidation.
+  // --- FullEnrich (B3) : jamais bloquant. Premier passage : on LANCE le
+  // waterfall et on rend le dossier sans attendre — le navigateur sonde
+  // /api/fullenrich/status. Second passage (fullenrichEnrichmentId fourni) :
+  // le lot est prêt, on RÉCUPÈRE les coordonnées et elles entrent dans la
+  // consolidation comme n'importe quelle source — corroboration ou conflit,
+  // c'est l'arbitrage du moteur qui tranche, pas le connecteur.
   let fullenrichEnrichmentId: string | null = null;
-  if (profilPrincipal && (profilPrincipal.first_name || profilPrincipal.last_name)) {
+  let observationsFullenrich: ObservationsParChamp = {};
+  if (entree.fullenrichEnrichmentId) {
+    try {
+      const statut = await getFullEnrichClient().getBulkStatus(entree.fullenrichEnrichmentId);
+      if (statut.status === 'FINISHED') {
+        observationsFullenrich = normaliserResultatBulk(statut)['interlocuteur_principal'] ?? {};
+      } else {
+        fullenrichEnrichmentId = entree.fullenrichEnrichmentId; // pas prêt — le client re-sondera
+      }
+      pousserTrace('collecte.fullenrich', 'appel_outil', {
+        outil: 'get_bulk_status',
+        statut: statut.status,
+        champs: Object.keys(observationsFullenrich),
+      });
+    } catch (err) {
+      marquerIndisponible('fullenrich', 'collecte.fullenrich', err);
+    }
+  } else if (profilPrincipal && (profilPrincipal.first_name || profilPrincipal.last_name)) {
     const contacts = construireContactsAEnrichir([
       {
         contactId: 'interlocuteur_principal',
@@ -146,6 +162,14 @@ export async function qualifierLead(entree: EntreeQualification): Promise<Result
       }
     }
   }
+
+  // --- Observations externes, clés NomChamp du schéma A1 ---
+  const observationsExternes: ObservationsParChamp = fusionnerObservations(
+    mappingSummary ? normaliserEntreprise(mappingSummary, company) : {},
+    profilPrincipal ? normaliserProfilMapping(profilPrincipal, mappingSummary?.request_date ?? null) : {},
+    normaliserSignauxAchat(signauxBruts),
+    observationsFullenrich,
+  );
 
   // --- Le moteur (axe A) : branchement CRM, arbitrage, signalement, scores ---
   const dossier = consoliderDossier({

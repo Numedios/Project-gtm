@@ -7,12 +7,17 @@ export { FullEnrichClientError } from './client';
 export * from './types';
 export * from './waterfall';
 
-let instance: FullEnrichClient | null = null;
+// Singleton sur globalThis, pas en variable de module : le mock est STATEFUL
+// (il retient les lots lancés) et Next.js compile chaque route dans son propre
+// bundle en dev — un module-level `instance` donnerait un mock par route, et
+// l'enrichment_id lancé par /api/qualify serait inconnu de /api/fullenrich/status.
+const CLE_GLOBALE = Symbol.for('qualif-ae.fullenrich-client');
 
 export function getFullEnrichClient(): FullEnrichClient {
-  if (!instance) {
+  const registre = globalThis as { [CLE_GLOBALE]?: FullEnrichClient };
+  if (!registre[CLE_GLOBALE]) {
     const useMock = process.env.FULLENRICH_USE_MOCK === 'true' || !process.env.FULLENRICH_API_KEY;
-    instance = useMock ? new FullEnrichMockClient() : new FullEnrichHttpClient();
+    registre[CLE_GLOBALE] = useMock ? new FullEnrichMockClient() : new FullEnrichHttpClient();
   }
-  return instance;
+  return registre[CLE_GLOBALE];
 }
