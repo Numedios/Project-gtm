@@ -1,0 +1,337 @@
+{
+  "id": "dossier_acme_001",
+  "statut": "NOUVEAU_LEAD",
+  "cree_le": "2026-07-09T08:00:00.000Z",
+  "entreprise": {
+    "nom": {
+      "observations": [
+        {
+          "valeur": "Acme Corp",
+          "source": "sillage",
+          "date_donnee": "2026-06-30T00:00:00.000Z",
+          "confiance_source": 0.9
+        }
+      ],
+      "valeur_retenue": "Acme Corp",
+      "confiance": 0.9,
+      "volatilite": "stable"
+    },
+    "pays_siege": {
+      "observations": [
+        {
+          "valeur": "France",
+          "source": "sillage",
+          "date_donnee": "2026-06-28T00:00:00.000Z",
+          "confiance_source": 0.85
+        },
+        {
+          "valeur": "Belgique",
+          "source": "crm",
+          "date_donnee": "2026-05-01T00:00:00.000Z",
+          "confiance_source": 0.6
+        }
+      ],
+      "valeur_retenue": "France",
+      "confiance": 0.6,
+      "volatilite": "stable"
+    },
+    "secteur": {
+      "observations": [
+        {
+          "valeur": "SaaS B2B",
+          "source": "sillage",
+          "date_donnee": "2026-06-30T00:00:00.000Z",
+          "confiance_source": 0.8
+        }
+      ],
+      "valeur_retenue": "SaaS B2B",
+      "confiance": 0.8,
+      "volatilite": "volatile"
+    },
+    "effectif": {
+      "observations": [
+        {
+          "valeur": 220,
+          "source": "sillage",
+          "date_donnee": "2026-06-30T00:00:00.000Z",
+          "confiance_source": 0.8
+        },
+        {
+          "valeur": 235,
+          "source": "crm",
+          "date_donnee": "2026-01-15T00:00:00.000Z",
+          "confiance_source": 0.5
+        }
+      ],
+      "valeur_retenue": 220,
+      "confiance": 0.8,
+      "volatilite": "volatile"
+    },
+    "techno": {
+      "observations": [
+        {
+          "valeur": ["Salesforce", "AWS", "Segment"],
+          "source": "sillage",
+          "date_donnee": "2026-06-30T00:00:00.000Z",
+          "confiance_source": 0.75
+        }
+      ],
+      "valeur_retenue": ["Salesforce", "AWS", "Segment"],
+      "confiance": 0.75,
+      "volatilite": "volatile"
+    },
+    "competiteurs": {
+      "observations": [
+        {
+          "valeur": ["Concurrent A", "Concurrent B"],
+          "source": "sillage",
+          "date_donnee": "2026-06-30T00:00:00.000Z",
+          "confiance_source": 0.7
+        }
+      ],
+      "valeur_retenue": ["Concurrent A", "Concurrent B"],
+      "confiance": 0.7,
+      "volatilite": "volatile"
+    },
+    "site_web": {
+      "observations": [
+        {
+          "valeur": "https://acme-corp.example",
+          "source": "sillage",
+          "date_donnee": "2026-06-30T00:00:00.000Z",
+          "confiance_source": 0.95
+        }
+      ],
+      "valeur_retenue": "https://acme-corp.example",
+      "confiance": 0.95,
+      "volatilite": "stable"
+    },
+    "description": {
+      "observations": [
+        {
+          "valeur": "Plateforme SaaS de gestion de la relation client pour PME.",
+          "source": "sillage",
+          "date_donnee": "2026-06-30T00:00:00.000Z",
+          "confiance_source": 0.7
+        }
+      ],
+      "valeur_retenue": "Plateforme SaaS de gestion de la relation client pour PME.",
+      "confiance": 0.7,
+      "volatilite": "volatile"
+    },
+    "historique_deals": []
+  },
+  "decideurs": [
+    {
+      "id": "decideur_marie_durand",
+      "nom": {
+        "observations": [
+          {
+            "valeur": "Marie Durand",
+            "source": "sillage",
+            "date_donnee": "2026-06-30T00:00:00.000Z",
+            "confiance_source": 0.9
+          }
+        ],
+        "valeur_retenue": "Marie Durand",
+        "confiance": 0.9,
+        "volatilite": "stable"
+      },
+      "titre": {
+        "observations": [
+          {
+            "valeur": "VP Sales",
+            "source": "sillage",
+            "date_donnee": "2026-06-30T00:00:00.000Z",
+            "confiance_source": 0.85
+          },
+          {
+            "valeur": "Head of Sales",
+            "source": "crm",
+            "date_donnee": "2024-03-01T00:00:00.000Z",
+            "confiance_source": 0.5
+          }
+        ],
+        "valeur_retenue": "VP Sales",
+        "confiance": 0.85,
+        "volatilite": "volatile"
+      },
+      "seniorite": {
+        "observations": [
+          {
+            "valeur": "C-level -1",
+            "source": "sillage",
+            "date_donnee": "2026-06-30T00:00:00.000Z",
+            "confiance_source": 0.8
+          }
+        ],
+        "valeur_retenue": "C-level -1",
+        "confiance": 0.8,
+        "volatilite": "volatile"
+      },
+      "email": {
+        "observations": [
+          {
+            "valeur": "marie.durand@acme-corp.example",
+            "source": "fullenrich",
+            "date_donnee": "2026-07-01T00:00:00.000Z",
+            "confiance_source": 0.9
+          },
+          {
+            "valeur": "marie.durand@acme-corp.example",
+            "source": "sillage",
+            "date_donnee": "2026-06-30T00:00:00.000Z",
+            "confiance_source": 0.6
+          }
+        ],
+        "valeur_retenue": "marie.durand@acme-corp.example",
+        "confiance": 0.97,
+        "volatilite": "volatile"
+      },
+      "telephone": {
+        "observations": [
+          {
+            "valeur": "+33 6 12 34 56 78",
+            "source": "fullenrich",
+            "date_donnee": "2026-07-01T00:00:00.000Z",
+            "confiance_source": 0.75
+          }
+        ],
+        "valeur_retenue": "+33 6 12 34 56 78",
+        "confiance": 0.75,
+        "volatilite": "volatile"
+      },
+      "linkedin_url": {
+        "observations": [
+          {
+            "valeur": "https://linkedin.com/in/marie-durand-example",
+            "source": "sillage",
+            "date_donnee": "2026-06-30T00:00:00.000Z",
+            "confiance_source": 0.8
+          }
+        ],
+        "valeur_retenue": "https://linkedin.com/in/marie-durand-example",
+        "confiance": 0.8,
+        "volatilite": "stable"
+      },
+      "historique_relationnel": {
+        "deals": [
+          {
+            "id": "deal_001",
+            "entreprise": "Autre Entreprise SAS",
+            "date": "2023-11-10T00:00:00.000Z",
+            "statut": "gagne",
+            "montant": 18000,
+            "notes": "Deal conclu alors que Marie Durand travaillait chez un précédent employeur."
+          }
+        ],
+        "autre_entreprise": true
+      }
+    }
+  ],
+  "signaux": [
+    {
+      "id": "signal_001",
+      "type": "changement_decisionnaire",
+      "description": "Marie Durand promue VP Sales (précédemment Head of Sales).",
+      "date": "2026-06-30T00:00:00.000Z",
+      "source": "sillage",
+      "entite_associee": "decideur_marie_durand"
+    },
+    {
+      "id": "signal_002",
+      "type": "recrutement",
+      "description": "Ouverture de 4 postes commerciaux en France sur les 30 derniers jours.",
+      "date": "2026-06-25T00:00:00.000Z",
+      "source": "sillage",
+      "entite_associee": null
+    }
+  ],
+  "conflits": [
+    {
+      "id": "conflit_001",
+      "champ": "pays_siege",
+      "entite": "entreprise",
+      "valeur_retenue": "France",
+      "source_retenue": "sillage",
+      "date_retenue": "2026-06-28T00:00:00.000Z",
+      "valeur_ecartee": "Belgique",
+      "source_ecartee": "crm",
+      "date_ecartee": "2026-05-01T00:00:00.000Z",
+      "regle": "recence",
+      "ecart_jours": 58,
+      "resolution": "auto",
+      "a_signaler_AE": true
+    }
+  ],
+  "questions": [
+    {
+      "id": "question_001",
+      "ordre": 0,
+      "champ": "pays_siege",
+      "entite": "entreprise",
+      "type": "confirmation",
+      "texte": "Le siège d'Acme Corp est-il bien en France ?",
+      "conflit_id": "conflit_001"
+    },
+    {
+      "id": "question_002",
+      "ordre": 1,
+      "champ": null,
+      "entite": null,
+      "type": "ouverte",
+      "texte": "Quel est le principal déclencheur de ce projet côté Acme Corp ?",
+      "conflit_id": null
+    }
+  ],
+  "score_icp": {
+    "valeur": 0.78,
+    "decomposition": [
+      { "critere": "taille_entreprise", "poids": 0.3, "valeur": 0.9, "contribution": 0.27 },
+      { "critere": "secteur_cible", "poids": 0.3, "valeur": 1.0, "contribution": 0.3 },
+      { "critere": "techno_compatible", "poids": 0.2, "valeur": 0.6, "contribution": 0.12 },
+      { "critere": "signal_achat_recent", "poids": 0.2, "valeur": 0.45, "contribution": 0.09 }
+    ],
+    "prose": "Acme Corp coche l'essentiel de l'ICP : taille et secteur sont pleinement alignés. La pile technique n'est que partiellement compatible, et le signal d'achat récent — la promotion de Marie Durand — pèse modérément dans le score."
+  },
+  "score_completude": {
+    "valeur": 0.72,
+    "decomposition": [
+      { "critere": "interlocuteur_identifie", "poids": 0.3, "valeur": 1.0, "contribution": 0.3 },
+      { "critere": "champs_template_renseignes", "poids": 0.4, "valeur": 0.65, "contribution": 0.26 },
+      { "critere": "champs_jugement_icp", "poids": 0.3, "valeur": 0.53, "contribution": 0.16 }
+    ],
+    "prose": null
+  },
+  "statut_par_source": {
+    "sillage": "ok",
+    "fullenrich": "ok",
+    "crm": "ok"
+  },
+  "trace": [
+    {
+      "horodatage": "2026-07-09T08:00:00.100Z",
+      "etape": "collecte.sillage",
+      "type": "appel_outil",
+      "detail": { "outil": "get_company_mapping", "duree_ms": 412 }
+    },
+    {
+      "horodatage": "2026-07-09T08:00:00.350Z",
+      "etape": "collecte.fullenrich",
+      "type": "appel_outil",
+      "detail": { "outil": "bulk_enrich", "enrichment_id": "fe_9f2c", "duree_ms": 610 }
+    },
+    {
+      "horodatage": "2026-07-09T08:00:01.020Z",
+      "etape": "arbitrage.pays_siege",
+      "type": "decision_arbitrage",
+      "detail": { "regle": "recence", "gagnant": "sillage", "ecart_jours": 58 }
+    },
+    {
+      "horodatage": "2026-07-09T08:00:01.480Z",
+      "etape": "reconciliation.resolution_entites",
+      "type": "departage_llm",
+      "detail": { "paire": ["sillage:marie.durand", "crm:m.durand"], "decision": "meme_personne", "verifie": true }
+    }
+  ]
+}
