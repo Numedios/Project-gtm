@@ -262,3 +262,60 @@ h2 {
   font-size: 12.5px;
   font-style: italic;
 }
+
+.lead-form-fields {
+  display: grid;
+  grid-template-columns: 2fr 2fr 1fr;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 720px) {
+  .lead-form-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+.lead-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.lead-form input {
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: var(--text);
+  font-size: 13.5px;
+  font-family: inherit;
+}
+
+.lead-form input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.lead-form button {
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  padding: 9px 18px;
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.lead-form button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 85%, #fff);
+}
+
+.lead-form button:disabled {
+  background: var(--accent-dim);
+  cursor: default;
+}
