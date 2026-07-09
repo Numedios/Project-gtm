@@ -1,7 +1,8 @@
+import { CHAMPS, type NomChamp } from '@/lib/config/champs';
+
 export function formaterValeur(valeur: unknown): string {
   if (valeur == null) return '—';
   if (Array.isArray(valeur)) return valeur.join(', ');
-  if (typeof valeur === 'number') return String(valeur);
   return String(valeur);
 }
 
@@ -14,23 +15,14 @@ export function formaterPourcentage(v: number): string {
   return `${Math.round(v * 100)}%`;
 }
 
+// Le libellé humain vit dans la spec A1 (lib/config/champs.ts) — une seule
+// source de vérité, la même que celle des templates de questions du moteur.
 export function libelleChamp(champ: string): string {
-  const LIBELLES: Record<string, string> = {
-    nom: 'Nom',
-    pays_siege: 'Pays du siège',
-    secteur: 'Secteur',
-    effectif: 'Effectif',
-    techno: 'Technologies',
-    competiteurs: 'Compétiteurs',
-    site_web: 'Site web',
-    description: 'Description',
-    titre: 'Titre',
-    seniorite: 'Séniorité',
-    email: 'Email',
-    telephone: 'Téléphone',
-    linkedin_url: 'LinkedIn',
-  };
-  return LIBELLES[champ] ?? champ;
+  const spec = CHAMPS[champ as NomChamp];
+  if (!spec) return champ;
+  // "le nom légal" → "Nom légal"
+  const sansArticle = spec.label.replace(/^(le |la |les |l’|l')/i, '');
+  return sansArticle.charAt(0).toUpperCase() + sansArticle.slice(1);
 }
 
 export function libelleSource(source: string): string {

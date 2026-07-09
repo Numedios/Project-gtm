@@ -1,7 +1,8 @@
 import { ProfilAE } from '@/lib/schema/canonical';
 
-// Mémoire long-terme par AE (brief §9) : un profil de préférence, texte
-// résumé en cinq slots fermés. Lecture : uniquement B6. Écriture : depuis le
+// Mémoire long-terme par AE (brief §9) : un profil de préférence en cinq slots
+// fermés — le schéma exact vit dans lib/schema/canonical.ts (strictObject :
+// tout champ inconnu lève). Lecture : uniquement B6. Écriture : depuis le
 // feedback de l'AE, via lib/memoire-ae/feedback.ts — jamais de texte libre.
 //
 // Implémentation en mémoire pour le hackathon : suffisant pour la démo,
@@ -12,11 +13,11 @@ export interface StoreProfilAE {
 }
 
 const PROFIL_PAR_DEFAUT: ProfilAE = {
-  registre: 'formel',
+  registre: 'neutre',
   longueur: 'moyenne',
-  tournure: 'directe',
-  tutoiement: 'non',
-  densite_jargon: 'moyenne',
+  tournure: 'interrogative',
+  tutoiement: 'vous',
+  densite_jargon: 'metier',
 };
 
 class StoreProfilAEMemoire implements StoreProfilAE {
@@ -27,8 +28,8 @@ class StoreProfilAEMemoire implements StoreProfilAE {
   }
 
   async ecrire(aeId: string, profil: ProfilAE): Promise<void> {
-    // `.strict()` fait lever le parse si un champ hors des cinq slots
-    // s'est glissé dans l'appelant — invariant garanti par le type, pas par revue.
+    // strictObject : le parse lève si un champ hors des cinq slots s'est
+    // glissé dans l'appelant — invariant garanti par le type, pas par revue.
     this.profils.set(aeId, ProfilAE.parse(profil));
   }
 }

@@ -1,21 +1,20 @@
 import { z } from 'zod/v4'; // requis par zodOutputFormat — voir lib/llm/reconciliation.ts
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
-import type { Score } from '@/lib/schema/canonical';
+import type { ScoreIcp } from '@/lib/schema/canonical';
 import { contenuParse, getAnthropicClient, MODELE_JUGEMENT } from './anthropic';
 
-// B5 — met en PROSE une décomposition déjà calculée par du code pur (axe A).
-// Ne calcule ni n'ajuste jamais le chiffre : le score et sa décomposition
-// entrent tels quels, seul `prose` sort de cet appel. Si on laissait le
-// modèle produire le score et la justification ensemble, rien ne
-// garantirait qu'ils concordent — voir docs/axe-B-surface.md §B5.
+// B5 — met en PROSE une décomposition déjà calculée par lib/moteur/scoring
+// (axe A). Ne calcule ni n'ajuste jamais le chiffre : le ScoreIcp entre tel
+// quel, seule la prose sort. Chaque ligne de la décomposition porte déjà son
+// `detail` déterministe — le modèle ne fait que les tisser en un paragraphe.
 
 const ProseScore = z.object({ prose: z.string() });
 
-export async function mettreEnProseDecompositionIcp(score: Score): Promise<string> {
+export async function mettreEnProseDecompositionIcp(score: ScoreIcp): Promise<string> {
   const client = getAnthropicClient();
 
   const decompositionTexte = score.decomposition
-    .map((d) => `- ${d.critere} : valeur ${d.valeur} × poids ${d.poids} = contribution ${d.contribution}`)
+    .map((d) => `- ${d.critere} (poids ${d.poids}, score ${d.score}) : ${d.detail}`)
     .join('\n');
 
   const reponse = await client.messages.parse({
@@ -27,7 +26,7 @@ export async function mettreEnProseDecompositionIcp(score: Score): Promise<strin
       {
         role: 'user',
         content: [
-          `Score ICP déjà calculé : ${score.valeur}.`,
+          `Score ICP déjà calculé : ${score.score}/100.`,
           'Décomposition par critère (déjà calculée, ne pas la recalculer ni la contredire) :',
           decompositionTexte,
           '',

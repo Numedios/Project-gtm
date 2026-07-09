@@ -3,7 +3,8 @@
 // canonique, lui, reste sur zod classique — les deux coexistent dans zod 3.25+.
 import { z } from 'zod/v4';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
-import type { TraceEvent, Source } from '@/lib/schema/canonical';
+import type { Source } from '@/lib/schema/canonical';
+import type { TraceEvent } from '@/lib/pipeline/trace';
 import { contenuParse, getAnthropicClient, MODELE_JUGEMENT } from './anthropic';
 
 // Le point dur du système (docs/axe-B-surface.md §B4). Deux étages :

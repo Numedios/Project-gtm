@@ -1,31 +1,27 @@
-// Contrat partagé entre l'axe A (moteur) et l'axe B (surface).
-// Figé avant que les deux postes divergent — voir SYNTHESE.md.
-// Axe B ne fait QUE consommer et produire des données conformes à ce schéma ;
-// la logique d'arbitrage / signalement / scoring vit dans lib/engine/ (axe A).
-
+/**
+ * Contrat partagé entre le poste 1 (moteur) et le poste 2 (surface).
+ * Une seule source de vérité, en Zod. Toute donnée qui traverse la frontière
+ * entre les deux postes est conforme à ce fichier — jamais un import croisé.
+ *
+ * Voir docs/axe-A-moteur.md « Le contrat partagé ».
+ */
 import { z } from 'zod';
 
 // ---------------------------------------------------------------------------
-// Sources
+// Sources et estampilles
 // ---------------------------------------------------------------------------
 
 export const Source = z.enum(['sillage', 'fullenrich', 'crm']);
 export type Source = z.infer<typeof Source>;
 
-export const StatutSource = z.enum(['ok', 'indisponible', 'partiel']);
-export type StatutSource = z.infer<typeof StatutSource>;
-
-export const StatutParSource = z.record(Source, StatutSource);
-export type StatutParSource = z.infer<typeof StatutParSource>;
-
-// ---------------------------------------------------------------------------
-// Observation estampillée — le socle factuel. On les conserve TOUTES.
-// ---------------------------------------------------------------------------
-
+/**
+ * Une observation estampillée. On les conserve TOUTES : l'union n'écrase pas.
+ * `date_donnee: null` ⇒ pas d'arbitrage automatique possible sur ce prétendant.
+ */
 export const Observation = z.object({
   valeur: z.unknown(),
   source: Source,
-  date_donnee: z.string().datetime().nullable(), // null ⇒ pas d'arbitrage possible
+  date_donnee: z.iso.datetime().nullable(),
   confiance_source: z.number().min(0).max(1),
 });
 export type Observation = z.infer<typeof Observation>;
@@ -34,197 +30,135 @@ export const Volatilite = z.enum(['stable', 'volatile']);
 export type Volatilite = z.infer<typeof Volatilite>;
 
 // ---------------------------------------------------------------------------
-// Champ consolidé — sortie de l'arbitrage (axe A). Jamais aplati au merge.
+// Résolution et signalement — deux notions découplées (A3)
+// ---------------------------------------------------------------------------
+
+/**
+ * `auto`       — l'arbitrage a su trancher.
+ * `impossible` — il n'a pas su (date manquante, confiances égales à date égale).
+ * `absente`    — rien à arbitrer : aucune source ne renseigne le champ.
+ *                Ce n'est PAS un conflit (audit/02 §2.4) ; ça fait chuter la
+ *                complétude et alimente une question ouverte.
+ */
+export const Resolution = z.enum(['auto', 'impossible', 'absente']);
+export type Resolution = z.infer<typeof Resolution>;
+
+// ---------------------------------------------------------------------------
+// Émissions : signaux et questions
+// ---------------------------------------------------------------------------
+
+/** Divergence sur un champ volatile : un changement, pas une erreur. */
+export const Signal = z.object({
+  type: z.literal('changement'),
+  champ: z.string(),
+  ancienne_valeur: z.unknown(),
+  nouvelle_valeur: z.unknown(),
+  source_nouvelle: Source,
+  message: z.string(),
+});
+export type Signal = z.infer<typeof Signal>;
+
+/**
+ * `confirmation` — l'arbitrage a tranché mais il faut faire vérifier
+ *                  (« Le siège est-il bien en France ? »).
+ * `ouverte`      — l'arbitrage n'a pas pu trancher, ou le champ est absent
+ *                  (« Où se situe le siège social ? »).
+ */
+export const Question = z.object({
+  type: z.enum(['confirmation', 'ouverte']),
+  champ: z.string(),
+  texte: z.string(),
+});
+export type Question = z.infer<typeof Question>;
+
+// ---------------------------------------------------------------------------
+// Champ consolidé
 // ---------------------------------------------------------------------------
 
 export const ChampConsolide = z.object({
+  champ: z.string(),
   observations: z.array(Observation), // jamais aplaties
-  valeur_retenue: z.unknown(), // DÉRIVÉE des observations
+  valeur_retenue: z.unknown(),        // DÉRIVÉE des observations ; null si non tranché
   confiance: z.number().min(0).max(1),
   volatilite: Volatilite,
+  resolution: Resolution,
+  a_signaler_AE: z.boolean(),
 });
 export type ChampConsolide = z.infer<typeof ChampConsolide>;
 
 // ---------------------------------------------------------------------------
-// Signalement — resolution et a_signaler_AE sont DÉCOUPLÉS (voir audit/01 §1.2)
+// Scores
 // ---------------------------------------------------------------------------
 
-export const Resolution = z.enum(['auto', 'impossible']);
-export type Resolution = z.infer<typeof Resolution>;
-
-export const TypeQuestion = z.enum(['confirmation', 'ouverte']);
-export type TypeQuestion = z.infer<typeof TypeQuestion>;
-
-// Enregistrement de conflit — sortie Réconciliation/Arbitrage → dossier AE.
-export const Conflit = z.object({
-  id: z.string(),
-  champ: z.string(),
-  entite: z.string(), // "entreprise", ou nom du décideur concerné
-  valeur_retenue: z.unknown(),
-  source_retenue: Source.nullable(),
-  date_retenue: z.string().datetime().nullable(),
-  valeur_ecartee: z.unknown().nullable(),
-  source_ecartee: Source.nullable(),
-  date_ecartee: z.string().datetime().nullable(),
-  regle: z.enum(['recence', 'tolerance', 'confiance_source', 'aucune_date']),
-  ecart_jours: z.number().nullable(),
-  resolution: Resolution,
-  a_signaler_AE: z.boolean(),
-});
-export type Conflit = z.infer<typeof Conflit>;
-
-// Question de qualification posée à l'AE — un conflit signalé en devient une.
-// L'ordre de la liste est figé par le poste 1 ; B6 ne réécrit que `texte`.
-export const Question = z.object({
-  id: z.string(),
-  ordre: z.number().int().nonnegative(),
-  champ: z.string().nullable(), // null pour une question de fond (hors conflit de champ)
-  entite: z.string().nullable(),
-  type: TypeQuestion,
-  texte: z.string(), // forme — réécrite par B6, jamais réordonnée ni ajoutée/supprimée
-  conflit_id: z.string().nullable(),
-});
-export type Question = z.infer<typeof Question>;
-
-// Signal d'achat — daté, sourcé, catégorisé. Jamais une question en soi.
-export const TypeSignal = z.enum([
-  'recrutement',
-  'nouveau_produit',
-  'changement_decisionnaire',
-  'ex_client',
-  'visites_site',
-]);
-export type TypeSignal = z.infer<typeof TypeSignal>;
-
-export const Signal = z.object({
-  id: z.string(),
-  type: TypeSignal,
-  description: z.string(),
-  date: z.string().datetime(),
-  source: Source,
-  entite_associee: z.string().nullable(),
-});
-export type Signal = z.infer<typeof Signal>;
-
-// ---------------------------------------------------------------------------
-// Historique CRM — une seule source possible, ne peut jamais entrer en conflit.
-// ---------------------------------------------------------------------------
-
-export const DealCRM = z.object({
-  id: z.string(),
-  entreprise: z.string(),
-  date: z.string().datetime(),
-  statut: z.enum(['gagne', 'perdu', 'en_cours']),
-  montant: z.number().nullable(),
-  notes: z.string().nullable(), // texte libre tiers — à délimiter avant tout prompt (B4)
-});
-export type DealCRM = z.infer<typeof DealCRM>;
-
-export const HistoriqueRelationnel = z.object({
-  deals: z.array(DealCRM),
-  autre_entreprise: z.boolean(), // true si le deal listé concerne une AUTRE entreprise que le lead actuel
-});
-export type HistoriqueRelationnel = z.infer<typeof HistoriqueRelationnel>;
-
-// ---------------------------------------------------------------------------
-// Entreprise — champs firmographiques, chacun consolidé indépendamment.
-// ---------------------------------------------------------------------------
-
-export const Entreprise = z.object({
-  nom: ChampConsolide,
-  pays_siege: ChampConsolide,
-  secteur: ChampConsolide,
-  effectif: ChampConsolide,
-  techno: ChampConsolide,
-  competiteurs: ChampConsolide,
-  site_web: ChampConsolide,
-  description: ChampConsolide,
-  historique_deals: z.array(DealCRM), // CRM uniquement — jamais de conflit
-});
-export type Entreprise = z.infer<typeof Entreprise>;
-
-// ---------------------------------------------------------------------------
-// Décideur — un membre de l'organigramme, champs consolidés + coordonnées FE.
-// ---------------------------------------------------------------------------
-
-export const Decideur = z.object({
-  id: z.string(),
-  nom: ChampConsolide,
-  titre: ChampConsolide,
-  seniorite: ChampConsolide,
-  email: ChampConsolide,
-  telephone: ChampConsolide,
-  linkedin_url: ChampConsolide,
-  historique_relationnel: HistoriqueRelationnel, // CRM uniquement — jamais de conflit
-});
-export type Decideur = z.infer<typeof Decideur>;
-
-// ---------------------------------------------------------------------------
-// Scores — fonctions pures côté axe A. B5 met SEULEMENT `prose` en mots.
-// ---------------------------------------------------------------------------
-
-export const DecompositionItem = z.object({
+/** Une ligne de la décomposition ICP. Le LLM (B5) met ces lignes en prose,
+ *  il ne calcule ni n'ajuste jamais `score`. */
+export const CritereIcp = z.object({
   critere: z.string(),
-  poids: z.number(),
-  valeur: z.number(),
-  contribution: z.number(),
+  poids: z.number().min(0),
+  score: z.number().min(0).max(1), // contribution normalisée du critère
+  valeur_observee: z.unknown(),    // ce qui a été comparé à la cible
+  detail: z.string(),              // explication déterministe, template
 });
-export type DecompositionItem = z.infer<typeof DecompositionItem>;
+export type CritereIcp = z.infer<typeof CritereIcp>;
 
-export const Score = z.object({
-  valeur: z.number(),
-  decomposition: z.array(DecompositionItem),
-  prose: z.string().nullable(), // rempli par B5 (score_icp) — jamais par le score_completude
+export const ScoreIcp = z.object({
+  score: z.number().min(0).max(100),
+  decomposition: z.array(CritereIcp),
 });
-export type Score = z.infer<typeof Score>;
+export type ScoreIcp = z.infer<typeof ScoreIcp>;
 
-// ---------------------------------------------------------------------------
-// Trace — un événement journalisé par run. Le livrable d'auditabilité.
-// ---------------------------------------------------------------------------
-
-export const TraceEvent = z.object({
-  horodatage: z.string().datetime(),
-  etape: z.string(),
-  type: z.enum(['appel_outil', 'decision_arbitrage', 'departage_llm', 'erreur']),
-  detail: z.unknown(),
+export const Completude = z.object({
+  score: z.number().min(0).max(1),
+  couverture_ponderee: z.number().min(0).max(1),
+  interlocuteur_identifie: z.boolean(),
+  champs_icp_presents: z.number().min(0).max(1),
+  champs_manquants: z.array(z.string()),
 });
-export type TraceEvent = z.infer<typeof TraceEvent>;
+export type Completude = z.infer<typeof Completude>;
 
 // ---------------------------------------------------------------------------
-// Profil AE — mémoire long-terme. Schéma FERMÉ, cinq slots stylistiques.
-// `types de lead` explicitement retiré (audit/01 §1.3). Tout champ inconnu lève.
+// Dossier consolidé — la sortie du moteur
 // ---------------------------------------------------------------------------
 
-export const ProfilAE = z
-  .object({
-    registre: z.enum(['formel', 'familier']),
-    longueur: z.enum(['courte', 'moyenne', 'détaillée']),
-    tournure: z.enum(['directe', 'indirecte']),
-    tutoiement: z.enum(['oui', 'non']),
-    densite_jargon: z.enum(['faible', 'moyenne', 'élevée']),
-  })
-  .strict(); // tout champ hors des cinq slots fait échouer le parse
-export type ProfilAE = z.infer<typeof ProfilAE>;
+export const Branche = z.enum(['MISE_A_JOUR', 'NOUVEAU_LEAD']);
+export type Branche = z.infer<typeof Branche>;
 
-// ---------------------------------------------------------------------------
-// Dossier de qualification — l'assemblage final.
-// ---------------------------------------------------------------------------
+/** Panne partielle d'une source (audit/02 §2.5) : l'AE lit « indisponible »,
+ *  il ne constate pas une absence silencieuse. */
+export const StatutSource = z.enum(['ok', 'indisponible']);
+export type StatutSource = z.infer<typeof StatutSource>;
 
-export const StatutDossier = z.enum(['NOUVEAU_LEAD', 'MISE_A_JOUR']);
-export type StatutDossier = z.infer<typeof StatutDossier>;
-
-export const DossierQualification = z.object({
-  id: z.string(),
-  statut: StatutDossier,
-  cree_le: z.string().datetime(),
-  entreprise: Entreprise,
-  decideurs: z.array(Decideur),
+export const DossierConsolide = z.object({
+  branche: Branche,
+  champs: z.record(z.string(), ChampConsolide),
   signaux: z.array(Signal),
-  conflits: z.array(Conflit),
   questions: z.array(Question),
-  score_icp: Score,
-  score_completude: Score,
-  statut_par_source: StatutParSource,
-  trace: z.array(TraceEvent),
+  statut_sources: z.record(Source, StatutSource),
+  completude: Completude,
+  score_icp: ScoreIcp,
+  /** Historique CRM mono-source (deals, relationnel) : remonté tel quel,
+   *  ne peut jamais entrer en conflit. */
+  historique: z.object({
+    deals: z.array(z.unknown()),
+    relationnel: z.array(z.unknown()),
+  }),
 });
-export type DossierQualification = z.infer<typeof DossierQualification>;
+export type DossierConsolide = z.infer<typeof DossierConsolide>;
+
+// ---------------------------------------------------------------------------
+// Profil AE — schéma FERMÉ de cinq slots stylistiques (audit/01 §1.3)
+// ---------------------------------------------------------------------------
+
+/**
+ * Énumérations bornées, objet strict : tout champ inconnu lève à la validation.
+ * C'est ce qui neutralise par construction le vecteur d'injection n°1
+ * (feedback AE persisté). Ne JAMAIS élargir sans repasser par l'audit.
+ */
+export const ProfilAE = z.strictObject({
+  registre: z.enum(['formel', 'neutre', 'direct']),
+  longueur: z.enum(['courte', 'moyenne', 'detaillee']),
+  tournure: z.enum(['interrogative', 'affirmative']),
+  tutoiement: z.enum(['tu', 'vous']),
+  densite_jargon: z.enum(['grand_public', 'metier', 'expert']),
+});
+export type ProfilAE = z.infer<typeof ProfilAE>;

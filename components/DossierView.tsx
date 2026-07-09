@@ -1,47 +1,86 @@
-import type { DossierQualification } from '@/lib/schema/canonical';
+import type { DossierConsolide } from '@/lib/schema/canonical';
+import { CHAMPS, type NomChamp } from '@/lib/config/champs';
 import { ChampConsolideRow } from './ChampConsolideRow';
-import { DecideurCard } from './DecideurCard';
 import { Questions } from './Questions';
 import { Signaux } from './Signaux';
-import { ScoreCard } from './ScoreCard';
+import { CompletudeCard, ScoreIcpCard } from './ScoreCards';
 import { StatutParSourceBadges } from './StatutParSourceBadges';
+import { formaterValeur } from '@/lib/ui/format';
 
-const CHAMPS_ENTREPRISE = [
-  'nom',
-  'pays_siege',
-  'secteur',
-  'effectif',
-  'techno',
-  'competiteurs',
-  'site_web',
-  'description',
-] as const;
+// L'écran AE (B1) : le dossier consolidé du moteur, les conflits devenus
+// questions, les signaux, les deux scores, statut_sources — §B1.
 
-// L'écran AE : le dossier consolidé, les conflits devenus questions, les
-// signaux, les deux scores, statut_par_source — voir docs/axe-B-surface.md §B1.
-export function DossierView({ dossier }: { dossier: DossierQualification }) {
+// Groupes d'affichage, dans l'ordre du schéma A1 (lib/config/champs.ts).
+const GROUPES: { titre: string; champs: NomChamp[] }[] = [
+  {
+    titre: 'Entreprise',
+    champs: [
+      'nom_legal',
+      'domaine',
+      'pays_siege',
+      'ville_siege',
+      'secteur',
+      'effectif',
+      'ca_annuel',
+      'site_web',
+      'linkedin_entreprise',
+      'annee_creation',
+      'description',
+      'techno_stack',
+    ],
+  },
+  {
+    titre: 'Interlocuteur',
+    champs: [
+      'prenom',
+      'nom',
+      'titre',
+      'seniorite',
+      'email',
+      'telephone',
+      'linkedin_contact',
+      'localisation_contact',
+      'date_prise_poste',
+    ],
+  },
+  {
+    titre: 'Signaux d’achat (Sillage)',
+    champs: ['signaux_achat'],
+  },
+  {
+    titre: 'CRM',
+    champs: ['historique_deals', 'historique_relationnel', 'notes_crm', 'stade_pipeline'],
+  },
+];
+
+export function DossierView({ dossier, proseIcp }: { dossier: DossierConsolide; proseIcp?: string | null }) {
+  const nomAffiche = dossier.champs.nom_legal?.valeur_retenue ?? dossier.champs.domaine?.valeur_retenue ?? 'Lead';
+
+  // Un champ absent de toutes les sources ET optionnel n'apporte rien à
+  // l'écran — on ne montre l'absence que si elle est signalée (question) ou
+  // si le champ est essentiel/important.
+  const visible = (nom: NomChamp) => {
+    const champ = dossier.champs[nom];
+    if (!champ) return false;
+    if (champ.resolution !== 'absente') return true;
+    return champ.a_signaler_AE || CHAMPS[nom].importance !== 'optionnel';
+  };
+
   return (
     <main>
       <div className="header-row">
         <div>
-          <h1>{String(dossier.entreprise.nom.valeur_retenue)}</h1>
-          <span className={`badge ${dossier.statut === 'NOUVEAU_LEAD' ? 'badge-ok' : 'badge-warn'}`}>
-            {dossier.statut === 'NOUVEAU_LEAD' ? 'Nouveau lead' : 'Mise à jour'}
+          <h1>{formaterValeur(nomAffiche)}</h1>
+          <span className={`badge ${dossier.branche === 'NOUVEAU_LEAD' ? 'badge-ok' : 'badge-warn'}`}>
+            {dossier.branche === 'NOUVEAU_LEAD' ? 'Nouveau lead' : 'Mise à jour'}
           </span>
         </div>
-        <StatutParSourceBadges statuts={dossier.statut_par_source} />
+        <StatutParSourceBadges statuts={dossier.statut_sources} />
       </div>
 
       <div className="grid-2">
-        <ScoreCard titre="Score ICP" score={dossier.score_icp} />
-        <ScoreCard titre="Score de complétude" score={dossier.score_completude} />
-      </div>
-
-      <div className="panel">
-        <h2>Entreprise</h2>
-        {CHAMPS_ENTREPRISE.map((champ) => (
-          <ChampConsolideRow key={champ} champ={champ} valeur={dossier.entreprise[champ]} />
-        ))}
+        <ScoreIcpCard score={dossier.score_icp} prose={proseIcp} />
+        <CompletudeCard completude={dossier.completude} />
       </div>
 
       <div className="panel">
@@ -50,22 +89,38 @@ export function DossierView({ dossier }: { dossier: DossierQualification }) {
       </div>
 
       <div className="panel">
-        <h2>Signaux d'achat</h2>
+        <h2>Changements détectés</h2>
         <Signaux signaux={dossier.signaux} />
       </div>
 
-      <div className="panel">
-        <h2>Décideurs</h2>
-        {dossier.decideurs.length === 0 ? (
-          <p className="empty-state">Aucun décideur identifié.</p>
-        ) : (
-          <div className="grid-2">
-            {dossier.decideurs.map((d) => (
-              <DecideurCard key={d.id} decideur={d} />
+      {GROUPES.map((groupe) => {
+        const champsVisibles = groupe.champs.filter(visible);
+        if (champsVisibles.length === 0) return null;
+        return (
+          <div key={groupe.titre} className="panel">
+            <h2>{groupe.titre}</h2>
+            {champsVisibles.map((nom) => (
+              <ChampConsolideRow key={nom} valeur={dossier.champs[nom]!} />
             ))}
           </div>
-        )}
-      </div>
+        );
+      })}
+
+      {(dossier.historique.deals.length > 0 || dossier.historique.relationnel.length > 0) && (
+        <div className="panel">
+          <h2>Historique CRM (mono-source)</h2>
+          {dossier.historique.deals.map((d, i) => (
+            <div key={`deal_${i}`} className="observation-list" style={{ marginTop: 6 }}>
+              {JSON.stringify(d)}
+            </div>
+          ))}
+          {dossier.historique.relationnel.map((d, i) => (
+            <div key={`rel_${i}`} className="observation-list" style={{ marginTop: 6 }}>
+              {JSON.stringify(d)}
+            </div>
+          ))}
+        </div>
+      )}
     </main>
   );
 }

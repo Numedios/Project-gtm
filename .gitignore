@@ -3,6 +3,19 @@ env
 .env
 .env.*
 *.key
+Connecter les API.txt
+
+# Dépendances
+node_modules/
+
+# Next.js
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# Config locale Claude Code (chemins machine)
+.claude/
 
 # macOS
 .DS_Store

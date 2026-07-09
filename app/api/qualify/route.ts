@@ -19,12 +19,12 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { dossier, fullenrichEnrichmentId } = await qualifierLead({
+    const resultat = await qualifierLead({
       domaine: parseResult.data.domaine,
       emailContact: parseResult.data.email_contact,
       aeId: parseResult.data.ae_id,
     });
-    return NextResponse.json({ dossier, fullenrich_enrichment_id: fullenrichEnrichmentId });
+    return NextResponse.json(resultat);
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Erreur inconnue du pipeline' },

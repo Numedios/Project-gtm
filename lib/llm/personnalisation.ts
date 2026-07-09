@@ -1,29 +1,41 @@
 import type { ProfilAE, Question } from '@/lib/schema/canonical';
+import { estPersonnalisationValide } from '@/lib/moteur/personnalisation';
 import { getAnthropicClient, MODELE_REDACTION } from './anthropic';
 
 // B6 — la forme, jamais le fond. `messages.create()` : seul point du système
 // qui produit du texte destiné à un humain (docs/axe-B-surface.md §B6).
 //
-// Invariant de bijection : même cardinalité, même ordre, seul `texte` change.
-// L'ordre des questions est figé en amont — le réordonner reviendrait à
-// hiérarchiser le fond, ce que la personnalisation n'a pas le droit de faire.
-// On le VÉRIFIE ici, à la frontière, plutôt que de faire confiance au texte
-// libre renvoyé par le modèle : si une ligne manque, on lève plutôt que de
-// laisser passer une liste tronquée ou réordonnée en silence.
+// Invariant de bijection : même cardinalité, même ordre, même champ, même
+// type ; seul `texte` change. L'ordre des questions est FIGÉ par le moteur
+// (consoliderDossier) — le réordonner reviendrait à hiérarchiser le fond.
+// La sortie passe par le validateur du moteur (estPersonnalisationValide),
+// comme son en-tête l'exige : on vérifie à la frontière plutôt que de faire
+// confiance au texte libre renvoyé par le modèle.
 
-function formaterQuestion(q: Question, index: number): string {
-  return `${index}: [${q.type}] ${q.texte}`;
-}
+const LIBELLE_PROFIL: Record<keyof ProfilAE, Record<string, string>> = {
+  registre: { formel: 'registre formel', neutre: 'registre neutre', direct: 'registre direct, sans détour' },
+  longueur: { courte: 'phrases courtes', moyenne: 'longueur moyenne', detaillee: 'formulations détaillées' },
+  tournure: { interrogative: 'tournure interrogative', affirmative: 'tournure affirmative (« Confirmez que… »)' },
+  tutoiement: { tu: 'tutoiement', vous: 'vouvoiement' },
+  densite_jargon: {
+    grand_public: 'vocabulaire grand public, zéro jargon',
+    metier: 'vocabulaire métier usuel',
+    expert: 'vocabulaire expert, jargon bienvenu',
+  },
+};
 
 function construirePrompt(questions: Question[], profil: ProfilAE): string {
-  const liste = questions.map((q, i) => formaterQuestion(q, i)).join('\n');
+  const style = (Object.keys(LIBELLE_PROFIL) as (keyof ProfilAE)[])
+    .map((slot) => LIBELLE_PROFIL[slot][profil[slot]])
+    .join(', ');
+  const liste = questions.map((q, i) => `${i}: [${q.type}] ${q.texte}`).join('\n');
+
   return [
-    "Reformule la TOURNURE de chacune des questions ci-dessous selon le profil de style de l'AE.",
-    'Ne change jamais le FOND de la question : ne reformule pas pour ajouter ou retirer une',
-    "information, n'ajoute et ne supprime aucune question, ne change pas leur ordre.",
+    "Reformule la TOURNURE de chacune des questions ci-dessous selon le style de l'AE.",
+    'Ne change jamais le FOND : ne rajoute ni ne retire aucune information, aucune question,',
+    'et ne change pas leur ordre.',
     '',
-    `Profil de style — registre: ${profil.registre}, longueur: ${profil.longueur}, tournure: ${profil.tournure}, ` +
-      `tutoiement: ${profil.tutoiement}, jargon: ${profil.densite_jargon}.`,
+    `Style : ${style}.`,
     '',
     'Questions (une par ligne, à réécrire à l’identique en nombre et en ordre) :',
     liste,
@@ -57,14 +69,19 @@ export async function personnaliserQuestions(questions: Question[], profil: Prof
   const blocTexte = reponse.content.find((b) => b.type === 'text');
   const parLigne = parserReponse(blocTexte?.type === 'text' ? blocTexte.text : '', questions.length);
 
-  // Bijection non négociable : si le modèle a fusionné, sauté ou décalé une
-  // ligne, on ne laisse PAS passer une liste dépareillée — on refuse la
-  // personnalisation plutôt que de trahir l'invariant fond/forme.
   if (parLigne.size !== questions.length) {
     throw new Error(
       `Personnalisation rejetée : ${parLigne.size}/${questions.length} questions reformulées — bijection rompue`,
     );
   }
 
-  return questions.map((q, i) => ({ ...q, texte: parLigne.get(i) ?? q.texte }));
+  const personnalisees = questions.map((q, i) => ({ ...q, texte: parLigne.get(i) ?? q.texte }));
+
+  // Le validateur du MOTEUR a le dernier mot — même champ, même type, même
+  // ordre. S'il refuse, on lève : l'appelant sert les questions d'origine.
+  if (!estPersonnalisationValide(questions, personnalisees)) {
+    throw new Error('Personnalisation rejetée par estPersonnalisationValide — bijection rompue');
+  }
+
+  return personnalisees;
 }
