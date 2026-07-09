@@ -1,0 +1,101 @@
+{
+  "$commentaire": "Dossier d'exemple du contrat partagé — validé contre lib/schema/canonical.ts par tests/contrat.test.ts. Le poste 2 consomme cette forme, jamais un import du moteur.",
+  "branche": "MISE_A_JOUR",
+  "champs": {
+    "pays_siege": {
+      "champ": "pays_siege",
+      "observations": [
+        { "valeur": "France", "source": "crm", "date_donnee": "2026-06-20T00:00:00Z", "confiance_source": 0.9 },
+        { "valeur": "Belgique", "source": "fullenrich", "date_donnee": "2026-07-01T00:00:00Z", "confiance_source": 0.8 }
+      ],
+      "valeur_retenue": "Belgique",
+      "confiance": 0.79,
+      "volatilite": "stable",
+      "resolution": "auto",
+      "a_signaler_AE": true
+    },
+    "titre": {
+      "champ": "titre",
+      "observations": [
+        { "valeur": "Head of Sales", "source": "crm", "date_donnee": "2024-11-02T00:00:00Z", "confiance_source": 0.9 },
+        { "valeur": "VP Sales", "source": "sillage", "date_donnee": "2026-06-28T00:00:00Z", "confiance_source": 0.85 }
+      ],
+      "valeur_retenue": "VP Sales",
+      "confiance": 0.84,
+      "volatilite": "volatile",
+      "resolution": "auto",
+      "a_signaler_AE": false
+    },
+    "effectif": {
+      "champ": "effectif",
+      "observations": [
+        { "valeur": 120, "source": "sillage", "date_donnee": "2026-07-01T00:00:00Z", "confiance_source": 0.85 },
+        { "valeur": 127, "source": "fullenrich", "date_donnee": "2026-06-15T00:00:00Z", "confiance_source": 0.8 }
+      ],
+      "valeur_retenue": 120,
+      "confiance": 0.85,
+      "volatilite": "volatile",
+      "resolution": "auto",
+      "a_signaler_AE": false
+    },
+    "ca_annuel": {
+      "champ": "ca_annuel",
+      "observations": [],
+      "valeur_retenue": null,
+      "confiance": 0,
+      "volatilite": "volatile",
+      "resolution": "absente",
+      "a_signaler_AE": true
+    }
+  },
+  "signaux": [
+    {
+      "type": "changement",
+      "champ": "titre",
+      "ancienne_valeur": "Head of Sales",
+      "nouvelle_valeur": "VP Sales",
+      "source_nouvelle": "sillage",
+      "message": "Changement détecté sur le titre : « Head of Sales » → « VP Sales »."
+    }
+  ],
+  "questions": [
+    {
+      "type": "confirmation",
+      "champ": "pays_siege",
+      "texte": "Le pays du siège social est-il bien « Belgique » ?"
+    },
+    {
+      "type": "ouverte",
+      "champ": "ca_annuel",
+      "texte": "Quel est le chiffre d’affaires ?"
+    }
+  ],
+  "statut_sources": {
+    "sillage": "ok",
+    "fullenrich": "ok",
+    "crm": "ok"
+  },
+  "completude": {
+    "score": 0.62,
+    "couverture_ponderee": 0.58,
+    "interlocuteur_identifie": true,
+    "champs_icp_presents": 0.75,
+    "champs_manquants": ["ca_annuel", "email"]
+  },
+  "score_icp": {
+    "$commentaire": "ICP parfait alors que la complétude est à 0.62 — les deux scores ne se confondent pas.",
+    "score": 100,
+    "decomposition": [
+      { "critere": "secteur", "poids": 3, "score": 1, "valeur_observee": "saas", "detail": "Secteur « saas » dans la cible (saas, fintech, martech)." },
+      { "critere": "effectif", "poids": 2, "score": 1, "valeur_observee": 120, "detail": "Effectif 120 dans la fourchette cible 50–500." },
+      { "critere": "geographie", "poids": 2, "score": 1, "valeur_observee": "Belgique", "detail": "Pays « Belgique » dans la zone cible." },
+      { "critere": "seniorite", "poids": 3, "score": 1, "valeur_observee": "vp", "detail": "Séniorité « vp » décisionnaire." }
+    ]
+  },
+  "historique": {
+    "deals": [],
+    "relationnel": [
+      { "contact": "marie.durand@exemple.com", "entreprise_precedente": "Acme SA", "deal": "Gagné 2024" }
+    ]
+  }
+}
