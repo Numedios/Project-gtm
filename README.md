@@ -2,6 +2,8 @@
 
 Hackathon GTM · Anthropic × FullEnrich × Sillage
 
+**App en ligne : <https://project-gtm-olive.vercel.app/>**
+
 Un AE passe vingt à trente minutes à transformer un lead entrant en dossier exploitable.
 Ce projet croise trois sources — CRM, Sillage, FullEnrich — et produit un **dossier
 consolidé où chaque champ porte sa provenance** (source, date, confiance). Quand les
