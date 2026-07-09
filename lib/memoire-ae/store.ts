@@ -34,11 +34,17 @@ class StoreProfilAEMemoire implements StoreProfilAE {
   }
 }
 
-let instance: StoreProfilAE | null = null;
+// Singleton sur globalThis, pas en variable de module : le store est STATEFUL
+// et Next.js compile chaque route dans son propre bundle en dev — un
+// module-level `instance` donnerait un store par route, et le profil écrit
+// par /api/feedback serait invisible de /api/qualify (même piège que le mock
+// FullEnrich, voir lib/fullenrich/index.ts).
+const CLE_GLOBALE = Symbol.for('qualif-ae.store-profil-ae');
 
 export function getStoreProfilAE(): StoreProfilAE {
-  if (!instance) instance = new StoreProfilAEMemoire();
-  return instance;
+  const registre = globalThis as { [CLE_GLOBALE]?: StoreProfilAE };
+  if (!registre[CLE_GLOBALE]) registre[CLE_GLOBALE] = new StoreProfilAEMemoire();
+  return registre[CLE_GLOBALE];
 }
 
 export { PROFIL_PAR_DEFAUT };
