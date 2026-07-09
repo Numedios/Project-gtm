@@ -1,0 +1,8 @@
+# Secrets — ne jamais versionner
+env
+.env
+.env.*
+*.key
+
+# macOS
+.DS_Store
