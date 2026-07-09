@@ -46,6 +46,7 @@ const CADENCE_ETAPES_MS = 2000;
 // Emails d'exemple (le domaine est dérivé de l'email par le pipeline) :
 // lesquels répondent dépend du mode — mock ou clés réelles.
 const EXEMPLES: { email: string; note: string }[] = [
+  { email: 'camille.roussel@payfit.com', note: 'démo PayFit — dossier complet, ICP 95' },
   { email: 'marie.durand@acme-corp.example', note: 'scénario riche (mock Sillage)' },
   { email: 'contact@acme.fr', note: 'connu du CRM → mise à jour' },
   { email: 'julien@spendesk.com', note: 'données Sillage réelles' },

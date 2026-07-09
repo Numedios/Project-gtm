@@ -6,6 +6,12 @@ import type {
   SillageLead,
   SillageSignalDetection,
 } from './types';
+import {
+  PAYFIT_COMPANY,
+  PAYFIT_MAPPING,
+  PAYFIT_MAPPING_DETAIL,
+  PAYFIT_SIGNALS,
+} from '@/lib/demo/payfit';
 
 // Pour construire contre, dès maintenant, sans réseau ni clé — voir
 // docs/axe-B-surface.md §B2 : "Tu travailles contre le mock dès maintenant."
@@ -151,20 +157,31 @@ const SIGNALS: SillageSignalDetection[] = [
   },
 ];
 
+// Plusieurs entreprises mockées : Acme (le dossier d'exemple) et PayFit
+// (le scénario de démo calibré — lib/demo/payfit.ts).
+const MAPPINGS: SillageCompanyMappingSummary[] = [MAPPING, PAYFIT_MAPPING];
+const DETAILS: SillageCompanyMappingDetail[] = [MAPPING_DETAIL, PAYFIT_MAPPING_DETAIL];
+const COMPANIES = new Map<number, SillageCompanyEnrichment>([
+  [MAPPING.company.id, COMPANY],
+  [COMPANY_SANS_MAPPING_ID, COMPANY_SANS_MAPPING],
+  [PAYFIT_MAPPING.company.id, PAYFIT_COMPANY],
+]);
+const TOUS_SIGNAUX = [...SIGNALS, ...PAYFIT_SIGNALS];
+
 export class SillageMockClient implements SillageClient {
   async findCompanyMappingByDomain(domaine: string): Promise<SillageCompanyMappingSummary | null> {
-    return domaine.trim().toLowerCase() === MAPPING.company.domain ? MAPPING : null;
+    const d = domaine.trim().toLowerCase();
+    return MAPPINGS.find((m) => m.company.domain === d) ?? null;
   }
 
   async getCompanyMapping(mappingId: number): Promise<SillageCompanyMappingDetail> {
-    if (mappingId !== MAPPING.id) throw new Error(`Mapping mock inconnu : ${mappingId}`);
-    return MAPPING_DETAIL;
+    const detail = DETAILS.find((m) => m.id === mappingId);
+    if (!detail) throw new Error(`Mapping mock inconnu : ${mappingId}`);
+    return detail;
   }
 
   async getCompany(companyId: number): Promise<SillageCompanyEnrichment | null> {
-    if (companyId === MAPPING.company.id) return COMPANY;
-    if (companyId === COMPANY_SANS_MAPPING_ID) return COMPANY_SANS_MAPPING;
-    return null;
+    return COMPANIES.get(companyId) ?? null;
   }
 
   async getLead(leadId: number): Promise<SillageLead | null> {
@@ -172,6 +189,6 @@ export class SillageMockClient implements SillageClient {
   }
 
   async listRecentSignals(params: { companyId?: number }): Promise<SillageSignalDetection[]> {
-    return params.companyId ? SIGNALS.filter((s) => s.company_id === params.companyId) : SIGNALS;
+    return params.companyId ? TOUS_SIGNAUX.filter((s) => s.company_id === params.companyId) : TOUS_SIGNAUX;
   }
 }

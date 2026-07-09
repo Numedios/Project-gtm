@@ -11,6 +11,7 @@
  * d'observations, voir fixtures/conflits.ts).
  */
 import type { NomChamp } from '@/lib/config/champs';
+import { PAYFIT_COMPTE_CRM, PAYFIT_CONTACT_CRM, PAYFIT_DEALS_CRM } from '@/lib/demo/payfit';
 
 // ---------------------------------------------------------------------------
 // Types de lecture
@@ -147,8 +148,12 @@ export const CRM_MOCK: CrmLectureSeule = new MockCrm({
       },
     },
     // Fixture n°11 — « neuve.ai » n'existe volontairement PAS ici.
+    // Scénario de démo PayFit (lib/demo/payfit.ts) : valeurs 2025 périmées,
+    // l'arbitrage par récence les remplace par celles de Sillage.
+    PAYFIT_COMPTE_CRM,
   ],
   contacts: [
+    PAYFIT_CONTACT_CRM,
     {
       // Fixture n°1 — titre CRM périmé (elle a été promue depuis).
       // Fixture n°9 — a fait un deal chez Globex, une AUTRE entreprise.
@@ -186,6 +191,7 @@ export const CRM_MOCK: CrmLectureSeule = new MockCrm({
       statut: 'en_cours',
       date: '2026-03-10T00:00:00Z',
     },
+    ...PAYFIT_DEALS_CRM,
   ],
 });
 
