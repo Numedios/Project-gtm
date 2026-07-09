@@ -35,6 +35,9 @@ export interface EntreeConsolidation {
   dateReference: string;
   config?: Partial<ConfigMoteur> | undefined;
   icp?: ConfigIcp | undefined;
+  /** Rattachements secteur observé → cible, décidés en amont (B4). Pure
+   *  donnée : le moteur reste déterministe. */
+  equivalencesSecteur?: Readonly<Record<string, string>> | undefined;
   /** Panne partielle d'une source : la source manquante fait chuter la
    *  complétude, et l'AE lit « indisponible » au lieu d'une absence muette. */
   statutSources?: Record<Source, StatutSource> | undefined;
@@ -177,6 +180,7 @@ export function consoliderDossier(entree: EntreeConsolidation): DossierConsolide
       seniorite: valeursRetenues.seniorite,
     },
     entree.icp ?? ICP_DEFAUT,
+    entree.equivalencesSecteur,
   );
 
   // La sortie repasse par le schéma canonique : le contrat est vérifié à la

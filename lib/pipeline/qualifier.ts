@@ -13,6 +13,8 @@ import { construireContactsAEnrichir, normaliserResultatBulk } from '@/lib/fulle
 import { normaliserResultatReverse } from '@/lib/fullenrich/reverse';
 import { getFullEnrichClient } from '@/lib/fullenrich';
 import { blocageDeterministe, resoudrePaireAmbigue, type CandidatIdentite } from '@/lib/llm/reconciliation';
+import { normaliserSecteur } from '@/lib/llm/taxonomie';
+import { ICP_DEFAUT } from '@/lib/config/icp';
 import { mettreEnProseDecompositionIcp } from '@/lib/llm/scoring-prose';
 import { personnaliserQuestions } from '@/lib/llm/personnalisation';
 import { getStoreProfilAE } from '@/lib/memoire-ae/store';
@@ -253,6 +255,27 @@ export async function qualifierLead(entree: EntreeQualification): Promise<Result
     observationsReverse,
   );
 
+  // --- B4, taxonomie secteur : « saas b2b » ∈ cible « saas » ? Jugement
+  // sémantique → LLM sélectionneur borné (lib/llm/taxonomie.ts). Le résultat
+  // entre dans le moteur comme une DONNÉE ; en cas d'échec LLM, pas de map —
+  // le critère retombe sur la comparaison exacte, le dossier n'est jamais bloqué.
+  const equivalencesSecteur: Record<string, string> = {};
+  const secteursObserves = [
+    ...new Set((observationsExternes.secteur ?? []).map((o) => String(o.valeur).trim().toLowerCase())),
+  ];
+  for (const secteur of secteursObserves) {
+    if ((ICP_DEFAUT.secteurs_cibles as readonly string[]).includes(secteur)) continue; // déterminisme épuisé d'abord
+    try {
+      const decision = await normaliserSecteur(secteur, ICP_DEFAUT.secteurs_cibles);
+      trace.push(decision.trace);
+      if (decision.cible) equivalencesSecteur[secteur] = decision.cible;
+    } catch (err) {
+      pousserTrace('scoring.taxonomie_secteur', 'erreur', {
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
   // --- Le moteur (axe A) : branchement CRM, arbitrage, signalement, scores ---
   const dossier = consoliderDossier({
     crm: CRM_MOCK,
@@ -260,6 +283,7 @@ export async function qualifierLead(entree: EntreeQualification): Promise<Result
     observationsExternes,
     dateReference: new Date().toISOString(),
     statutSources,
+    equivalencesSecteur,
   });
   pousserTrace('moteur.consolidation', 'decision_arbitrage', {
     branche: dossier.branche,

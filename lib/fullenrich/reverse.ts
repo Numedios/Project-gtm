@@ -45,6 +45,10 @@ export function normaliserResultatReverse(
   ajouter(observations, 'prenom', profil.first_name, date);
   ajouter(observations, 'nom', profil.last_name, date);
   ajouter(observations, 'titre', posteActuel?.title, date);
+  // FullEnrich est la SEULE source qui fournit une séniorité structurée
+  // (Sillage ne l'expose pas, assumé dans sillage/normalize.ts) — sans elle,
+  // le critère séniorité du score ICP (poids 3/10) reste toujours à zéro.
+  ajouter(observations, 'seniorite', posteActuel?.seniority, date);
   ajouter(observations, 'linkedin_contact', profil.social_profiles?.professional_network?.url ?? null, date);
   ajouter(
     observations,

@@ -119,3 +119,27 @@ describe('Formule 3 — dégradation progressive de l’effectif hors fourchette
     expect(c2000!.score).toBeLessThan(c600!.score);
   });
 });
+
+describe('Formule 3 — équivalences secteur (jugement B4 injecté en donnée)', () => {
+  const valeurs = { secteur: 'SaaS B2B', effectif: 200, pays_siege: 'France', seniorite: 'vp' };
+
+  it('sans map : « saas b2b » hors cible, critère à 0', () => {
+    const c = calculerScoreIcp(valeurs, ICP_DEFAUT).decomposition.find((d) => d.critere === 'secteur');
+    expect(c?.score).toBe(0);
+  });
+
+  it('avec rattachement « saas b2b » → « saas » : critère à 1, décision visible dans le detail', () => {
+    const c = calculerScoreIcp(valeurs, ICP_DEFAUT, { 'saas b2b': 'saas' }).decomposition.find(
+      (d) => d.critere === 'secteur',
+    );
+    expect(c?.score).toBe(1);
+    expect(c?.detail).toContain('rattaché');
+  });
+
+  it('un rattachement vers une valeur HORS cible ne compte pas', () => {
+    const c = calculerScoreIcp(valeurs, ICP_DEFAUT, { 'saas b2b': 'immobilier' }).decomposition.find(
+      (d) => d.critere === 'secteur',
+    );
+    expect(c?.score).toBe(0);
+  });
+});

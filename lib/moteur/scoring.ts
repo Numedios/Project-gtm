@@ -140,14 +140,19 @@ export function calculerScoreIcp(
     seniorite?: unknown;
   },
   icp: ConfigIcp = ICP_DEFAUT,
+  /** Rattachements secteur observé → secteur cible, décidés EN AMONT par le
+   *  jugement LLM B4 (lib/llm/taxonomie.ts). Ici c'est une pure donnée : la
+   *  formule reste déterministe et rejouable. Clés normalisées (minuscules). */
+  equivalencesSecteur?: Readonly<Record<string, string>>,
 ): ScoreIcp {
   const decomposition: CritereIcp[] = [];
 
   // Secteur — appartenance à la liste cible (taxonomie normalisée en amont, B4).
   {
     const v = valeurs.secteur;
-    const atteint =
-      estPresente(v) && icp.secteurs_cibles.includes(normaliser(v));
+    const brut = normaliser(v);
+    const canonique = equivalencesSecteur?.[brut] ?? brut;
+    const atteint = estPresente(v) && icp.secteurs_cibles.includes(canonique);
     decomposition.push({
       critere: 'secteur',
       poids: icp.poids.secteur,
@@ -156,8 +161,10 @@ export function calculerScoreIcp(
       detail: !estPresente(v)
         ? 'Secteur non renseigné.'
         : atteint
-          ? `Secteur « ${normaliser(v)} » dans la cible (${icp.secteurs_cibles.join(', ')}).`
-          : `Secteur « ${normaliser(v)} » hors cible (${icp.secteurs_cibles.join(', ')}).`,
+          ? canonique !== brut
+            ? `Secteur « ${brut} » rattaché à « ${canonique} » (jugement B4), dans la cible (${icp.secteurs_cibles.join(', ')}).`
+            : `Secteur « ${brut} » dans la cible (${icp.secteurs_cibles.join(', ')}).`
+          : `Secteur « ${brut} » hors cible (${icp.secteurs_cibles.join(', ')}).`,
     });
   }
 
