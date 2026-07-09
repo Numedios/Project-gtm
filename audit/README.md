@@ -28,6 +28,7 @@ pas.
 | [06-strategie-de-repli.md](06-strategie-de-repli.md) | Le §12 sacrifie la mauvaise branche | Moyenne |
 | [07-ordre-de-travail.md](07-ordre-de-travail.md) | Séquence à suivre, et blocage actuel | — |
 | [08-invariants-a-verifier.md](08-invariants-a-verifier.md) | Propriétés testables qui doivent guider la structure du code | — |
+| [09-score-icp-vide.md](09-score-icp-vide.md) | **Pourquoi le score ICP ne se remplit pas** : `seniorite` jamais alimentée + `secteur` comparé en texte libre à une taxonomie exacte (60 % du poids à 0) | **Élevée** |
 
 ## Ce qui est solide et doit être préservé
 
