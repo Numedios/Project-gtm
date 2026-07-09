@@ -45,8 +45,7 @@ function parserResultat(json: {
 }
 
 export function QualifierLead() {
-  const [domaine, setDomaine] = useState('acme-corp.example');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState('marie.durand@acme-corp.example');
   const [aeId, setAeId] = useState('ae-demo');
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -62,6 +61,7 @@ export function QualifierLead() {
   async function appelerQualify(corps: Record<string, string>): Promise<{
     etat: EtatResultat;
     fullenrichId: string | null;
+    reverseId: string | null;
   }> {
     const reponse = await fetch('/api/qualify', {
       method: 'POST',
@@ -72,37 +72,77 @@ export function QualifierLead() {
     if (!reponse.ok) {
       throw new Error(typeof json?.error === 'string' ? json.error : `Requête rejetée (${reponse.status})`);
     }
-    return { etat: parserResultat(json), fullenrichId: json.fullenrich_enrichment_id ?? null };
+    return {
+      etat: parserResultat(json),
+      fullenrichId: json.fullenrich_enrichment_id ?? null,
+      reverseId: json.fullenrich_reverse_id ?? null,
+    };
   }
 
-  async function suivreEnrichissement(enrichmentId: string, corpsInitial: Record<string, string>, run: number) {
-    for (let tentative = 0; tentative < MAX_SONDAGES && runRef.current === run; tentative++) {
-      try {
-        const reponse = await fetch(`/api/fullenrich/status?enrichment_id=${encodeURIComponent(enrichmentId)}`);
-        const json = await reponse.json();
-        if (!reponse.ok) throw new Error(typeof json?.error === 'string' ? json.error : 'statut FullEnrich illisible');
+  // Deux enrichissements FullEnrich en vol possibles : le waterfall de
+  // coordonnées (`contacts`) et le reverse email lookup (`reverse`). On sonde
+  // les deux et on ne re-qualifie qu'UNE fois, quand tout ce qui est en vol
+  // est terminal — jamais de patch local d'un champ, toujours un dossier
+  // entier re-consolidé.
+  async function suivreEnrichissements(
+    ids: { contacts: string | null; reverse: string | null },
+    corpsInitial: Record<string, string>,
+    run: number,
+  ) {
+    const enVol = new Map<'contacts' | 'reverse', string>();
+    if (ids.contacts) enVol.set('contacts', ids.contacts);
+    if (ids.reverse) enVol.set('reverse', ids.reverse);
+    const termines: Partial<Record<'contacts' | 'reverse', string>> = {};
 
-        if (json.status === 'FAILED') {
-          if (runRef.current === run) setStatutFullenrich('echec');
-          return;
-        }
+    for (let tentative = 0; tentative < MAX_SONDAGES && runRef.current === run && enVol.size > 0; tentative++) {
+      for (const [kind, id] of [...enVol]) {
+        try {
+          const reponse = await fetch(
+            `/api/fullenrich/status?enrichment_id=${encodeURIComponent(id)}&kind=${kind === 'reverse' ? 'reverse' : 'contacts'}`,
+          );
+          const json = await reponse.json();
+          if (!reponse.ok) throw new Error(typeof json?.error === 'string' ? json.error : 'statut FullEnrich illisible');
 
-        if (json.status === 'FINISHED') {
-          const { etat } = await appelerQualify({ ...corpsInitial, fullenrich_enrichment_id: enrichmentId });
-          if (runRef.current !== run) return;
-          setResultat(etat);
-          setStatutFullenrich('integre');
-          return;
+          if (json.status === 'FINISHED') {
+            termines[kind] = id;
+            enVol.delete(kind);
+          } else if (json.status !== 'IN_PROGRESS' && json.status !== 'CREATED') {
+            enVol.delete(kind); // FAILED, CANCELED, CREDITS_INSUFFICIENT… : terminal sans résultat
+          }
+        } catch {
+          enVol.delete(kind);
         }
-      } catch {
-        if (runRef.current === run) setStatutFullenrich('echec');
+      }
+      if (enVol.size > 0) await new Promise((r) => setTimeout(r, INTERVALLE_SONDAGE_MS));
+    }
+    if (runRef.current !== run) return;
+
+    // Toujours en vol après MAX_SONDAGES : on arrête d'espérer, le dossier
+    // affiché reste valable sans ces données.
+    if (!termines.contacts && !termines.reverse) {
+      setStatutFullenrich('echec');
+      return;
+    }
+
+    try {
+      const corps = { ...corpsInitial };
+      if (termines.contacts) corps.fullenrich_enrichment_id = termines.contacts;
+      if (termines.reverse) corps.fullenrich_reverse_id = termines.reverse;
+      const { etat, fullenrichId, reverseId } = await appelerQualify(corps);
+      if (runRef.current !== run) return;
+      setResultat(etat);
+      // La re-consolidation peut elle-même lancer un enrichissement : le
+      // reverse découvre le domaine → le mapping apparaît → le waterfall de
+      // coordonnées ne part QUE maintenant. On enchaîne le sondage avec le
+      // corps enrichi ; ça s'arrête tout seul quand plus rien n'est lancé.
+      if (fullenrichId || reverseId) {
+        void suivreEnrichissements({ contacts: fullenrichId, reverse: reverseId }, corps, run);
         return;
       }
-      await new Promise((r) => setTimeout(r, INTERVALLE_SONDAGE_MS));
+      setStatutFullenrich('integre');
+    } catch {
+      if (runRef.current === run) setStatutFullenrich('echec');
     }
-    // Toujours pas prêt après MAX_SONDAGES : on arrête d'espérer, le dossier
-    // affiché reste valable sans les coordonnées.
-    if (runRef.current === run) setStatutFullenrich('echec');
   }
 
   // La mémoire AE (§9) : le texte part au classifieur déterministe borné de
@@ -139,18 +179,17 @@ export function QualifierLead() {
     setStatutFullenrich(null);
 
     const corps: Record<string, string> = {
-      domaine: domaine.trim(),
-      ...(email.trim() ? { email_contact: email.trim() } : {}),
+      email: email.trim(),
       ae_id: aeId.trim(),
     };
 
     try {
-      const { etat, fullenrichId } = await appelerQualify(corps);
+      const { etat, fullenrichId, reverseId } = await appelerQualify(corps);
       if (runRef.current !== run) return;
       setResultat(etat);
-      if (fullenrichId) {
+      if (fullenrichId || reverseId) {
         setStatutFullenrich('en_cours');
-        void suivreEnrichissement(fullenrichId, corps, run);
+        void suivreEnrichissements({ contacts: fullenrichId, reverse: reverseId }, corps, run);
       }
     } catch (err) {
       if (runRef.current !== run) return;
@@ -174,21 +213,13 @@ export function QualifierLead() {
         <form className="panel lead-form" onSubmit={soumettre}>
           <div className="lead-form-fields">
             <label>
-              Domaine
-              <input
-                value={domaine}
-                onChange={(e) => setDomaine(e.target.value)}
-                placeholder="acme-corp.example"
-                required
-              />
-            </label>
-            <label>
-              Email du contact (optionnel)
+              Email du lead
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="marie.durand@acme-corp.example"
+                required
               />
             </label>
             <label>
@@ -196,7 +227,7 @@ export function QualifierLead() {
               <input value={aeId} onChange={(e) => setAeId(e.target.value)} required />
             </label>
           </div>
-          <button type="submit" disabled={enCours || !domaine.trim() || !aeId.trim()}>
+          <button type="submit" disabled={enCours || !email.trim() || !aeId.trim()}>
             {enCours ? 'Qualification…' : 'Qualifier le lead'}
           </button>
         </form>

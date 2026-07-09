@@ -11,6 +11,13 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // kind=reverse : sondage du reverse email lookup — on ne renvoie que le
+    // statut, les observations n'entrent que par la re-consolidation.
+    if (req.nextUrl.searchParams.get('kind') === 'reverse') {
+      const resultat = await getFullEnrichClient().getReverseResult(enrichmentId);
+      return NextResponse.json({ status: resultat.status });
+    }
+
     const resultat = await getFullEnrichClient().getBulkStatus(enrichmentId);
     return NextResponse.json({
       status: resultat.status,

@@ -1,6 +1,11 @@
 import type { FullEnrichClient } from './client';
 import { FullEnrichClientError } from './client';
-import type { FullEnrichBulkLaunchResponse, FullEnrichBulkStatusResponse, FullEnrichContactInput } from './types';
+import type {
+  FullEnrichBulkLaunchResponse,
+  FullEnrichBulkStatusResponse,
+  FullEnrichContactInput,
+  FullEnrichReverseResponse,
+} from './types';
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -62,6 +67,31 @@ export class FullEnrichHttpClient implements FullEnrichClient {
 
   async getBulkStatus(enrichmentId: string): Promise<FullEnrichBulkStatusResponse> {
     return fetchJson<FullEnrichBulkStatusResponse>(`${this.baseUrl()}/contact/enrich/bulk/${enrichmentId}`, {
+      method: 'GET',
+      headers: this.headers(),
+    });
+  }
+
+  // Reverse email lookup : 1 crédit par email TROUVÉ (rien si personne
+  // derrière l'email). Attention au champ `data` — le bulk contacts, lui,
+  // dit `datas` ; l'asymétrie est dans le contrat FullEnrich, pas chez nous.
+  async launchReverseEmail(emails: string[]): Promise<FullEnrichBulkLaunchResponse> {
+    if (emails.length === 0) {
+      throw new FullEnrichClientError('Aucun email pour le reverse lookup');
+    }
+
+    return fetchJson<FullEnrichBulkLaunchResponse>(`${this.baseUrl()}/contact/reverse/email/bulk`, {
+      method: 'POST',
+      headers: this.headers(),
+      body: JSON.stringify({
+        name: `qualif-ae-reverse-${new Date().toISOString()}`,
+        data: emails.map((email) => ({ email })),
+      }),
+    });
+  }
+
+  async getReverseResult(enrichmentId: string): Promise<FullEnrichReverseResponse> {
+    return fetchJson<FullEnrichReverseResponse>(`${this.baseUrl()}/contact/reverse/email/bulk/${enrichmentId}`, {
       method: 'GET',
       headers: this.headers(),
     });

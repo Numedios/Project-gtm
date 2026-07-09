@@ -6,6 +6,7 @@ export type { FullEnrichClient } from './client';
 export { FullEnrichClientError } from './client';
 export * from './types';
 export * from './waterfall';
+export * from './reverse';
 
 // Singleton sur globalThis, pas en variable de module : le mock est STATEFUL
 // (il retient les lots lancés) et Next.js compile chaque route dans son propre
