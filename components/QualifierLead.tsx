@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, type FormEvent } from 'react';
-import { DossierConsolide } from '@/lib/schema/canonical';
+import { DossierConsolide, type ProfilAE } from '@/lib/schema/canonical';
 import type { TraceEvent } from '@/lib/pipeline/trace';
 import { DossierView } from './DossierView';
 
@@ -52,6 +52,9 @@ export function QualifierLead() {
   const [erreur, setErreur] = useState<string | null>(null);
   const [resultat, setResultat] = useState<EtatResultat | null>(null);
   const [statutFullenrich, setStatutFullenrich] = useState<StatutFullenrich>(null);
+  const [feedbackTexte, setFeedbackTexte] = useState('');
+  const [feedbackEnCours, setFeedbackEnCours] = useState(false);
+  const [profilAE, setProfilAE] = useState<{ profil: ProfilAE; slotsModifies: string[] } | null>(null);
 
   // Chaque soumission invalide les sondages de la précédente.
   const runRef = useRef(0);
@@ -100,6 +103,32 @@ export function QualifierLead() {
     // Toujours pas prêt après MAX_SONDAGES : on arrête d'espérer, le dossier
     // affiché reste valable sans les coordonnées.
     if (runRef.current === run) setStatutFullenrich('echec');
+  }
+
+  // La mémoire AE (§9) : le texte part au classifieur déterministe borné de
+  // /api/feedback, qui SÉLECTIONNE des valeurs d'énumération — le texte libre
+  // n'est jamais persisté. L'effet se voit à la prochaine qualification (B6
+  // lit le profil au moment de personnaliser).
+  async function envoyerFeedback(e: FormEvent) {
+    e.preventDefault();
+    setFeedbackEnCours(true);
+    try {
+      const reponse = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ae_id: aeId.trim(), feedback: feedbackTexte.trim() }),
+      });
+      const json = await reponse.json();
+      if (!reponse.ok) {
+        throw new Error(typeof json?.error === 'string' ? json.error : `Feedback rejeté (${reponse.status})`);
+      }
+      setProfilAE({ profil: json.profil, slotsModifies: json.slots_modifies ?? [] });
+      setFeedbackTexte('');
+    } catch (err) {
+      setErreur(err instanceof Error ? err.message : 'Erreur inconnue');
+    } finally {
+      setFeedbackEnCours(false);
+    }
   }
 
   async function soumettre(e: FormEvent) {
@@ -198,6 +227,42 @@ export function QualifierLead() {
         <>
           <DossierView dossier={resultat.dossier} proseIcp={resultat.proseIcp} />
           <main style={{ paddingTop: 0 }}>
+            <form className="panel lead-form" onSubmit={envoyerFeedback}>
+              <h2>Feedback sur le style des questions</h2>
+              <div className="lead-form-fields" style={{ gridTemplateColumns: '1fr' }}>
+                <label>
+                  Ex. « tutoie-moi », « plus court », « évite le jargon »
+                  <input
+                    value={feedbackTexte}
+                    onChange={(e) => setFeedbackTexte(e.target.value)}
+                    placeholder="Comment préférez-vous que les questions soient formulées ?"
+                  />
+                </label>
+              </div>
+              <button type="submit" disabled={feedbackEnCours || !feedbackTexte.trim()}>
+                {feedbackEnCours ? 'Envoi…' : 'Mémoriser ma préférence'}
+              </button>
+              {profilAE && (
+                <div style={{ marginTop: 10 }}>
+                  {profilAE.slotsModifies.length > 0 ? (
+                    <span className="badge badge-ok">
+                      Profil mis à jour ({profilAE.slotsModifies.join(', ')}) — relancez une qualification pour voir
+                      les questions reformulées
+                    </span>
+                  ) : (
+                    <span className="badge badge-neutral">Feedback reçu, aucun slot du profil ne correspond</span>
+                  )}
+                  <div className="question-meta" style={{ marginTop: 8, flexWrap: 'wrap' }}>
+                    {Object.entries(profilAE.profil).map(([slot, valeur]) => (
+                      <span key={slot} className="badge badge-neutral">
+                        {slot} : {valeur}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </form>
+
             <details className="panel provenance">
               <summary>Trace du run ({resultat.trace.length} évènements)</summary>
               <div className="observation-list">
