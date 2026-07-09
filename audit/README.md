@@ -29,6 +29,7 @@ pas.
 | [07-ordre-de-travail.md](07-ordre-de-travail.md) | Séquence à suivre, et blocage actuel | — |
 | [08-invariants-a-verifier.md](08-invariants-a-verifier.md) | Propriétés testables qui doivent guider la structure du code | — |
 | [09-score-icp-vide.md](09-score-icp-vide.md) | **Pourquoi le score ICP ne se remplit pas** : `seniorite` jamais alimentée + `secteur` comparé en texte libre à une taxonomie exacte (60 % du poids à 0) | **Élevée** |
+| [10-references-mock.md](10-references-mock.md) | **Audit des références au mock** : Sillage et FullEnrich basculent silencieusement sur le mock si la clé manque, et aucun signal de mode n'est remonté (API ni UI) | **Élevée** |
 
 ## Ce qui est solide et doit être préservé
 
