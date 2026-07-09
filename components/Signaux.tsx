@@ -9,16 +9,29 @@ export function Signaux({ signaux }: { signaux: Signal[] }) {
   }
 
   return (
-    <div>
-      {signaux.map((s, i) => (
-        <div key={i} className="signal-card">
-          <div>{s.message}</div>
-          <div className="signal-meta">
-            {libelleChamp(s.champ)} : {formaterValeur(s.ancienne_valeur)} → {formaterValeur(s.nouvelle_valeur)} ·
-            source {libelleSource(s.source_nouvelle)}
-          </div>
-        </div>
-      ))}
-    </div>
+    <table className="tableau">
+      <thead>
+        <tr>
+          <th>Changement</th>
+          <th>Champ</th>
+          <th>Avant</th>
+          <th>Après</th>
+          <th>Source</th>
+        </tr>
+      </thead>
+      <tbody>
+        {signaux.map((s, i) => (
+          <tr key={i}>
+            <td className="cell-valeur">{s.message}</td>
+            <td className="cell-label">{libelleChamp(s.champ)}</td>
+            <td>{formaterValeur(s.ancienne_valeur)}</td>
+            <td className="cell-valeur">{formaterValeur(s.nouvelle_valeur)}</td>
+            <td>
+              <span className="badge badge-neutral">{libelleSource(s.source_nouvelle)}</span>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
