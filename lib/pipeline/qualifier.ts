@@ -10,6 +10,7 @@ import {
 } from '@/lib/sillage/normalize';
 import { signauxPourDomaine } from '@/lib/sillage/signaux';
 import { construireContactsAEnrichir, normaliserResultatBulk } from '@/lib/fullenrich/waterfall';
+import { normaliserResultatReverse } from '@/lib/fullenrich/reverse';
 import { getFullEnrichClient } from '@/lib/fullenrich';
 import { blocageDeterministe, resoudrePaireAmbigue, type CandidatIdentite } from '@/lib/llm/reconciliation';
 import { mettreEnProseDecompositionIcp } from '@/lib/llm/scoring-prose';
@@ -24,12 +25,25 @@ import type { TraceEvent } from './trace';
 // pas d'agent orchestrateur — docs/axe-B-surface.md §B7.
 
 export interface EntreeQualification {
-  domaine: string;
-  emailContact?: string | undefined;
+  // L'EMAIL est l'entrée obligatoire de la qualification — pas le domaine.
+  // Sillage n'expose aucune recherche par email (vérifié sur les 35 outils) :
+  // le domaine, dérivé de l'email, reste la clé de recherche entreprise ;
+  // l'email lui-même élit le profil principal et branche le contact CRM.
+  email: string;
   aeId: string;
   // Second passage de la boucle B3 : le waterfall lancé au premier passage
   // est prêt, on récupère ses coordonnées au lieu d'en lancer un nouveau.
   fullenrichEnrichmentId?: string | undefined;
+  // Même boucle pour le reverse email lookup (email → profil + domaine
+  // employeur) : lancé au premier passage, récupéré au second.
+  fullenrichReverseId?: string | undefined;
+}
+
+/** `marie.durand@acme.fr` → `acme.fr`. La validité de l'email est vérifiée en
+ *  amont (zod à la frontière API) ; ici on extrait, on ne valide pas. */
+export function domaineDepuisEmail(email: string): string {
+  const arobase = email.lastIndexOf('@');
+  return email.slice(arobase + 1).trim().toLowerCase();
 }
 
 export type { TraceEvent } from './trace';
@@ -39,6 +53,7 @@ export interface ResultatQualification {
   prose_icp: string | null;
   questions_personnalisees: DossierConsolide['questions'] | null;
   fullenrich_enrichment_id: string | null;
+  fullenrich_reverse_id: string | null;
   trace: TraceEvent[];
 }
 
@@ -55,10 +70,62 @@ export async function qualifierLead(entree: EntreeQualification): Promise<Result
     statutSources[source] = 'indisponible';
   };
 
+  // --- Reverse email lookup (B3) : AVANT la collecte Sillage, parce que le
+  // domaine qu'il découvre est la clé de TOUTE la collecte — mapping
+  // (organigramme), firmographie, signaux, branchement CRM, donc score ICP.
+  // Un lead qui écrit depuis un email perso (gmail…) n'a un dossier complet
+  // que si le domaine employeur découvert au passage 2 re-pilote la collecte.
+  // Premier passage : on LANCE et on rend le dossier sans attendre ; second
+  // passage (fullenrichReverseId fourni) : on RÉCUPÈRE le profil.
+  let fullenrichReverseId: string | null = null;
+  let observationsReverse: ObservationsParChamp = {};
+  if (entree.fullenrichReverseId) {
+    try {
+      const resultat = await getFullEnrichClient().getReverseResult(entree.fullenrichReverseId);
+      if (resultat.status === 'FINISHED') {
+        observationsReverse = normaliserResultatReverse(resultat, entree.email);
+      } else if (resultat.status === 'CREATED' || resultat.status === 'IN_PROGRESS') {
+        fullenrichReverseId = entree.fullenrichReverseId; // pas prêt — le client re-sondera
+      }
+      pousserTrace('collecte.fullenrich.reverse', 'appel_outil', {
+        outil: 'get_reverse_email',
+        statut: resultat.status,
+        champs: Object.keys(observationsReverse),
+      });
+    } catch (err) {
+      marquerIndisponible('fullenrich', 'collecte.fullenrich.reverse', err);
+    }
+  } else {
+    try {
+      const lancement = await getFullEnrichClient().launchReverseEmail([entree.email]);
+      fullenrichReverseId = lancement.enrichment_id;
+      pousserTrace('collecte.fullenrich.reverse', 'appel_outil', {
+        outil: 'launch_reverse_email',
+        enrichment_id: fullenrichReverseId,
+      });
+    } catch (err) {
+      marquerIndisponible('fullenrich', 'collecte.fullenrich.reverse', err);
+    }
+  }
+
+  // Le domaine de collecte : celui de l'employeur découvert par le reverse
+  // s'il existe, sinon celui de l'email. La décision est tracée.
+  const domaineEmail = domaineDepuisEmail(entree.email);
+  const premierDomaineReverse = observationsReverse.domaine?.[0]?.valeur;
+  const domaine =
+    typeof premierDomaineReverse === 'string' && premierDomaineReverse
+      ? premierDomaineReverse.trim().toLowerCase()
+      : domaineEmail;
+  pousserTrace('collecte.domaine', 'decision_arbitrage', {
+    domaine,
+    source: domaine === domaineEmail ? 'email' : 'fullenrich_reverse',
+    domaine_email: domaineEmail,
+  });
+
   // --- Collecte Sillage (le CRM est local : consoliderDossier le lit lui-même) ---
   const sillage = getSillageClient();
 
-  const mappingSummary = await sillage.findCompanyMappingByDomain(entree.domaine).catch((err) => {
+  const mappingSummary = await sillage.findCompanyMappingByDomain(domaine).catch((err) => {
     marquerIndisponible('sillage', 'collecte.sillage', err);
     return null;
   });
@@ -70,7 +137,7 @@ export async function qualifierLead(entree: EntreeQualification): Promise<Result
   // Les signaux ne dépendent PAS du mapping : les scores ICP et de complétude
   // en ont besoin même quand l'account mapping n'existe pas. Sans mapping,
   // signauxPourDomaine résout company_id → domaine via get_company.
-  const signauxPromise = signauxPourDomaine(sillage, entree.domaine, mappingSummary?.company.id ?? null).catch(
+  const signauxPromise = signauxPourDomaine(sillage, domaine, mappingSummary?.company.id ?? null).catch(
     (err) => {
       marquerIndisponible('sillage', 'collecte.sillage.signaux', err);
       return [];
@@ -124,7 +191,7 @@ export async function qualifierLead(entree: EntreeQualification): Promise<Result
 
   const profilsDedupliques = profilsMapping.filter((_, i) => !fusionnes.has(`sillage:${i}`));
   const profilPrincipal =
-    (entree.emailContact && profilsDedupliques.find((p) => p.email === entree.emailContact)) ||
+    profilsDedupliques.find((p) => p.email?.toLowerCase() === entree.email.trim().toLowerCase()) ||
     profilsDedupliques[0] ||
     null;
 
@@ -183,12 +250,13 @@ export async function qualifierLead(entree: EntreeQualification): Promise<Result
     profilPrincipal ? normaliserProfilMapping(profilPrincipal, mappingSummary?.request_date ?? null) : {},
     normaliserSignauxAchat(signauxBruts),
     observationsFullenrich,
+    observationsReverse,
   );
 
   // --- Le moteur (axe A) : branchement CRM, arbitrage, signalement, scores ---
   const dossier = consoliderDossier({
     crm: CRM_MOCK,
-    lead: { domaine: entree.domaine, email: entree.emailContact },
+    lead: { domaine, email: entree.email },
     observationsExternes,
     dateReference: new Date().toISOString(),
     statutSources,
@@ -231,6 +299,7 @@ export async function qualifierLead(entree: EntreeQualification): Promise<Result
     prose_icp: proseIcp,
     questions_personnalisees: questionsPersonnalisees,
     fullenrich_enrichment_id: fullenrichEnrichmentId,
+    fullenrich_reverse_id: fullenrichReverseId,
     trace,
   };
 }

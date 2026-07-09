@@ -3,12 +3,15 @@ import { z } from 'zod';
 import { qualifierLead } from '@/lib/pipeline/qualifier';
 
 const CorpsRequete = z.object({
-  domaine: z.string().min(1),
-  email_contact: z.string().email().optional(),
+  // L'email du lead est LA donnée obligatoire — le domaine en est dérivé par
+  // le pipeline (Sillage et FullEnrich sont interrogés à partir de lui).
+  email: z.string().email(),
   ae_id: z.string().min(1),
   // Second passage de la boucle FullEnrich (B3) : re-consolider avec les
-  // coordonnées du waterfall lancé au premier passage.
+  // coordonnées du waterfall et/ou le profil du reverse email lookup
+  // lancés au premier passage.
   fullenrich_enrichment_id: z.string().min(1).optional(),
+  fullenrich_reverse_id: z.string().min(1).optional(),
 });
 
 // Le pipeline lui-même : quelques dizaines de lignes de câblage, voir
@@ -23,10 +26,10 @@ export async function POST(req: NextRequest) {
 
   try {
     const resultat = await qualifierLead({
-      domaine: parseResult.data.domaine,
-      emailContact: parseResult.data.email_contact,
+      email: parseResult.data.email,
       aeId: parseResult.data.ae_id,
       fullenrichEnrichmentId: parseResult.data.fullenrich_enrichment_id,
+      fullenrichReverseId: parseResult.data.fullenrich_reverse_id,
     });
     return NextResponse.json(resultat);
   } catch (err) {
