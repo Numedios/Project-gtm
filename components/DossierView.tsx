@@ -9,11 +9,17 @@ import { formaterValeur } from '@/lib/ui/format';
 
 // L'écran AE (B1) : le dossier consolidé du moteur, les conflits devenus
 // questions, les signaux, les deux scores, statut_sources — §B1.
+//
+// Hiérarchie d'affichage : scores et questions toujours visibles (le cœur du
+// produit), groupes de champs en toggles — Entreprise et Interlocuteur
+// ouverts, les groupes secondaires repliés. Chaque groupe est un tableau,
+// la provenance se déplie par ligne (ChampConsolideRow).
 
 // Groupes d'affichage, dans l'ordre du schéma A1 (lib/config/champs.ts).
-const GROUPES: { titre: string; champs: NomChamp[] }[] = [
+const GROUPES: { titre: string; champs: NomChamp[]; ouvert: boolean }[] = [
   {
     titre: 'Entreprise',
+    ouvert: true,
     champs: [
       'nom_legal',
       'domaine',
@@ -31,6 +37,7 @@ const GROUPES: { titre: string; champs: NomChamp[] }[] = [
   },
   {
     titre: 'Interlocuteur',
+    ouvert: true,
     champs: [
       'prenom',
       'nom',
@@ -45,15 +52,67 @@ const GROUPES: { titre: string; champs: NomChamp[] }[] = [
   },
   {
     titre: 'Signaux d’achat (Sillage)',
+    ouvert: false,
     champs: ['signaux_achat'],
   },
   {
     titre: 'CRM',
+    ouvert: false,
     champs: ['historique_deals', 'historique_relationnel', 'notes_crm', 'stade_pipeline'],
   },
 ];
 
-export function DossierView({ dossier, proseIcp }: { dossier: DossierConsolide; proseIcp?: string | null }) {
+const ENTETES_CHAMPS = (
+  <thead>
+    <tr>
+      <th>Champ</th>
+      <th>Valeur retenue</th>
+      <th className="cell-num">Confiance</th>
+      <th>Statut</th>
+      <th className="cell-num">Provenance</th>
+    </tr>
+  </thead>
+);
+
+// Historique CRM : objets libres du CRM (z.unknown() dans le contrat) —
+// rendu générique clé/valeur, sans présumer de leur forme.
+function TableauObjetsLibres({ objets }: { objets: unknown[] }) {
+  return (
+    <table className="tableau">
+      <tbody>
+        {objets.map((objet, i) => (
+          <tr key={i}>
+            <td className="cell-label">#{i + 1}</td>
+            <td>
+              {objet && typeof objet === 'object' ? (
+                Object.entries(objet as Record<string, unknown>).map(([cle, val]) => (
+                  <div key={cle}>
+                    <span className="cell-label">{cle} : </span>
+                    <span className="cell-valeur">{formaterValeur(val)}</span>
+                  </div>
+                ))
+              ) : (
+                <span className="cell-valeur">{formaterValeur(objet)}</span>
+              )}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+export function DossierView({
+  dossier,
+  proseIcp,
+  stylePersonnalise,
+}: {
+  dossier: DossierConsolide;
+  proseIcp?: string | null;
+  // Les questions affichées sont-elles passées par B6 (mémoire AE) ?
+  // L'info vient de l'appelant : le dossier lui-même ne distingue pas.
+  stylePersonnalise?: boolean;
+}) {
   const nomAffiche = dossier.champs.nom_legal?.valeur_retenue ?? dossier.champs.domaine?.valeur_retenue ?? 'Lead';
 
   // Un champ absent de toutes les sources ET optionnel n'apporte rien à
@@ -65,6 +124,8 @@ export function DossierView({ dossier, proseIcp }: { dossier: DossierConsolide; 
     if (champ.resolution !== 'absente') return true;
     return champ.a_signaler_AE || CHAMPS[nom].importance !== 'optionnel';
   };
+
+  const aHistorique = dossier.historique.deals.length > 0 || dossier.historique.relationnel.length > 0;
 
   return (
     <main>
@@ -84,42 +145,73 @@ export function DossierView({ dossier, proseIcp }: { dossier: DossierConsolide; 
       </div>
 
       <div className="panel">
-        <h2>Questions de qualification ({dossier.questions.length})</h2>
+        <h2>
+          Questions de qualification ({dossier.questions.length}){' '}
+          {stylePersonnalise && <span className="badge badge-ok">style AE appliqué</span>}
+        </h2>
         <Questions questions={dossier.questions} />
       </div>
 
-      <div className="panel">
-        <h2>Changements détectés</h2>
-        <Signaux signaux={dossier.signaux} />
-      </div>
+      <details className="panel panel-toggle" open={dossier.signaux.length > 0}>
+        <summary>
+          Changements détectés
+          <span className={`badge ${dossier.signaux.length > 0 ? 'badge-warn' : 'badge-neutral'}`}>
+            {dossier.signaux.length}
+          </span>
+        </summary>
+        <div className="panel-toggle-corps table-scroll">
+          <Signaux signaux={dossier.signaux} />
+        </div>
+      </details>
 
       {GROUPES.map((groupe) => {
         const champsVisibles = groupe.champs.filter(visible);
         if (champsVisibles.length === 0) return null;
+        const aConfirmer = champsVisibles.filter((nom) => dossier.champs[nom]!.a_signaler_AE).length;
         return (
-          <div key={groupe.titre} className="panel">
-            <h2>{groupe.titre}</h2>
-            {champsVisibles.map((nom) => (
-              <ChampConsolideRow key={nom} valeur={dossier.champs[nom]!} />
-            ))}
-          </div>
+          <details key={groupe.titre} className="panel panel-toggle" open={groupe.ouvert}>
+            <summary>
+              {groupe.titre}
+              <span className="badge badge-neutral">{champsVisibles.length}</span>
+              {aConfirmer > 0 && <span className="badge badge-warn">{aConfirmer} à confirmer</span>}
+            </summary>
+            <div className="panel-toggle-corps table-scroll">
+              <table className="tableau">
+                {ENTETES_CHAMPS}
+                <tbody>
+                  {champsVisibles.map((nom) => (
+                    <ChampConsolideRow key={nom} valeur={dossier.champs[nom]!} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
         );
       })}
 
-      {(dossier.historique.deals.length > 0 || dossier.historique.relationnel.length > 0) && (
-        <div className="panel">
-          <h2>Historique CRM (mono-source)</h2>
-          {dossier.historique.deals.map((d, i) => (
-            <div key={`deal_${i}`} className="observation-list" style={{ marginTop: 6 }}>
-              {JSON.stringify(d)}
-            </div>
-          ))}
-          {dossier.historique.relationnel.map((d, i) => (
-            <div key={`rel_${i}`} className="observation-list" style={{ marginTop: 6 }}>
-              {JSON.stringify(d)}
-            </div>
-          ))}
-        </div>
+      {aHistorique && (
+        <details className="panel panel-toggle">
+          <summary>
+            Historique CRM (mono-source)
+            <span className="badge badge-neutral">
+              {dossier.historique.deals.length + dossier.historique.relationnel.length}
+            </span>
+          </summary>
+          <div className="panel-toggle-corps">
+            {dossier.historique.deals.length > 0 && (
+              <>
+                <h2 style={{ marginTop: 8 }}>Deals</h2>
+                <TableauObjetsLibres objets={dossier.historique.deals} />
+              </>
+            )}
+            {dossier.historique.relationnel.length > 0 && (
+              <>
+                <h2 style={{ marginTop: 12 }}>Relationnel</h2>
+                <TableauObjetsLibres objets={dossier.historique.relationnel} />
+              </>
+            )}
+          </div>
+        </details>
       )}
     </main>
   );

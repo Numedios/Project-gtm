@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { DossierConsolide, type ProfilAE } from '@/lib/schema/canonical';
 import type { TraceEvent } from '@/lib/pipeline/trace';
 import { DossierView } from './DossierView';
@@ -22,6 +22,7 @@ import { DossierView } from './DossierView';
 interface EtatResultat {
   dossier: DossierConsolide;
   proseIcp: string | null;
+  stylePersonnalise: boolean;
   trace: TraceEvent[];
 }
 
@@ -29,6 +30,24 @@ type StatutFullenrich = 'en_cours' | 'integre' | 'echec' | null;
 
 const INTERVALLE_SONDAGE_MS = 4000;
 const MAX_SONDAGES = 20;
+
+// Étapes INDICATIVES pendant l'attente : le pipeline ne streame pas sa
+// progression, on rythme l'affichage côté client — la trace fait foi après.
+const ETAPES_PIPELINE = [
+  'Collecte Sillage — mapping, profils, signaux',
+  'Réconciliation des identités',
+  'Consolidation et arbitrage (moteur)',
+  'Scores ICP et complétude, mise en prose',
+  'Personnalisation des questions (profil AE)',
+];
+const CADENCE_ETAPES_MS = 2200;
+
+// Domaines d'exemple : lesquels répondent dépend du mode (mock ou clés réelles).
+const EXEMPLES: { domaine: string; note: string }[] = [
+  { domaine: 'acme-corp.example', note: 'scénario riche (mock Sillage)' },
+  { domaine: 'acme.fr', note: 'connu du CRM → mise à jour' },
+  { domaine: 'spendesk.com', note: 'données Sillage réelles' },
+];
 
 function parserResultat(json: {
   dossier: unknown;
@@ -41,7 +60,12 @@ function parserResultat(json: {
     ...(json.dossier as Record<string, unknown>),
     questions: json.questions_personnalisees ?? brut.questions,
   });
-  return { dossier, proseIcp: json.prose_icp ?? null, trace: json.trace ?? [] };
+  return {
+    dossier,
+    proseIcp: json.prose_icp ?? null,
+    stylePersonnalise: json.questions_personnalisees != null,
+    trace: json.trace ?? [],
+  };
 }
 
 export function QualifierLead() {
@@ -49,6 +73,7 @@ export function QualifierLead() {
   const [email, setEmail] = useState('');
   const [aeId, setAeId] = useState('ae-demo');
   const [enCours, setEnCours] = useState(false);
+  const [etapeIdx, setEtapeIdx] = useState(0);
   const [erreur, setErreur] = useState<string | null>(null);
   const [resultat, setResultat] = useState<EtatResultat | null>(null);
   const [statutFullenrich, setStatutFullenrich] = useState<StatutFullenrich>(null);
@@ -58,6 +83,17 @@ export function QualifierLead() {
 
   // Chaque soumission invalide les sondages de la précédente.
   const runRef = useRef(0);
+
+  // Avance les étapes indicatives tant que la qualification tourne.
+  useEffect(() => {
+    if (!enCours) return;
+    setEtapeIdx(0);
+    const intervalle = setInterval(
+      () => setEtapeIdx((i) => Math.min(i + 1, ETAPES_PIPELINE.length - 1)),
+      CADENCE_ETAPES_MS,
+    );
+    return () => clearInterval(intervalle);
+  }, [enCours]);
 
   async function appelerQualify(corps: Record<string, string>): Promise<{
     etat: EtatResultat;
@@ -105,6 +141,45 @@ export function QualifierLead() {
     if (runRef.current === run) setStatutFullenrich('echec');
   }
 
+  async function lancerQualification(domaineCible: string) {
+    const run = ++runRef.current;
+    setEnCours(true);
+    setErreur(null);
+    setStatutFullenrich(null);
+
+    const corps: Record<string, string> = {
+      domaine: domaineCible.trim(),
+      ...(email.trim() ? { email_contact: email.trim() } : {}),
+      ae_id: aeId.trim(),
+    };
+
+    try {
+      const { etat, fullenrichId } = await appelerQualify(corps);
+      if (runRef.current !== run) return;
+      setResultat(etat);
+      if (fullenrichId) {
+        setStatutFullenrich('en_cours');
+        void suivreEnrichissement(fullenrichId, corps, run);
+      }
+    } catch (err) {
+      if (runRef.current !== run) return;
+      setErreur(err instanceof Error ? err.message : 'Erreur inconnue');
+      setResultat(null);
+    } finally {
+      if (runRef.current === run) setEnCours(false);
+    }
+  }
+
+  function soumettre(e: FormEvent) {
+    e.preventDefault();
+    void lancerQualification(domaine);
+  }
+
+  function qualifierExemple(d: string) {
+    setDomaine(d);
+    void lancerQualification(d);
+  }
+
   // La mémoire AE (§9) : le texte part au classifieur déterministe borné de
   // /api/feedback, qui SÉLECTIONNE des valeurs d'énumération — le texte libre
   // n'est jamais persisté. L'effet se voit à la prochaine qualification (B6
@@ -128,36 +203,6 @@ export function QualifierLead() {
       setErreur(err instanceof Error ? err.message : 'Erreur inconnue');
     } finally {
       setFeedbackEnCours(false);
-    }
-  }
-
-  async function soumettre(e: FormEvent) {
-    e.preventDefault();
-    const run = ++runRef.current;
-    setEnCours(true);
-    setErreur(null);
-    setStatutFullenrich(null);
-
-    const corps: Record<string, string> = {
-      domaine: domaine.trim(),
-      ...(email.trim() ? { email_contact: email.trim() } : {}),
-      ae_id: aeId.trim(),
-    };
-
-    try {
-      const { etat, fullenrichId } = await appelerQualify(corps);
-      if (runRef.current !== run) return;
-      setResultat(etat);
-      if (fullenrichId) {
-        setStatutFullenrich('en_cours');
-        void suivreEnrichissement(fullenrichId, corps, run);
-      }
-    } catch (err) {
-      if (runRef.current !== run) return;
-      setErreur(err instanceof Error ? err.message : 'Erreur inconnue');
-      setResultat(null);
-    } finally {
-      if (runRef.current === run) setEnCours(false);
     }
   }
 
@@ -201,6 +246,42 @@ export function QualifierLead() {
           </button>
         </form>
 
+        {enCours && (
+          <div className="panel">
+            <h2>Qualification en cours</h2>
+            <div className="etapes-chargement">
+              {ETAPES_PIPELINE.map((etape, i) => (
+                <div
+                  key={etape}
+                  className={`etape-chargement${i < etapeIdx ? ' faite' : ''}${i === etapeIdx ? ' active' : ''}`}
+                >
+                  <span className="puce" />
+                  {etape}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!enCours && !resultat && !erreur && (
+          <div className="panel">
+            <h2>Comment ça marche</h2>
+            <p style={{ margin: '0 0 4px' }}>
+              Trois sources (Sillage, FullEnrich, CRM) sont collectées puis <strong>réconciliées</strong> : chaque
+              conflit non tranché devient une question de qualification, chaque champ garde sa provenance. Le
+              dossier ressort scoré (ICP, complétude) et les questions sont reformulées au style de l’AE.
+            </p>
+            <div className="chips-exemples">
+              {EXEMPLES.map((ex) => (
+                <button key={ex.domaine} type="button" className="chip" onClick={() => qualifierExemple(ex.domaine)}>
+                  {ex.domaine}
+                  <span className="chip-note">{ex.note}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {erreur && (
           <div className="panel" style={{ borderColor: 'var(--danger)' }}>
             <span className="badge badge-danger">Erreur</span>
@@ -224,50 +305,72 @@ export function QualifierLead() {
       </main>
 
       {resultat && (
-        <>
-          <DossierView dossier={resultat.dossier} proseIcp={resultat.proseIcp} />
+        <div className={enCours ? 'resultat-attenue' : ''}>
+          <DossierView
+            dossier={resultat.dossier}
+            proseIcp={resultat.proseIcp}
+            stylePersonnalise={resultat.stylePersonnalise}
+          />
           <main style={{ paddingTop: 0 }}>
-            <form className="panel lead-form" onSubmit={envoyerFeedback}>
-              <h2>Feedback sur le style des questions</h2>
-              <div className="lead-form-fields" style={{ gridTemplateColumns: '1fr' }}>
-                <label>
-                  Ex. « tutoie-moi », « plus court », « évite le jargon »
-                  <input
-                    value={feedbackTexte}
-                    onChange={(e) => setFeedbackTexte(e.target.value)}
-                    placeholder="Comment préférez-vous que les questions soient formulées ?"
-                  />
-                </label>
-              </div>
-              <button type="submit" disabled={feedbackEnCours || !feedbackTexte.trim()}>
-                {feedbackEnCours ? 'Envoi…' : 'Mémoriser ma préférence'}
-              </button>
-              {profilAE && (
-                <div style={{ marginTop: 10 }}>
-                  {profilAE.slotsModifies.length > 0 ? (
-                    <span className="badge badge-ok">
-                      Profil mis à jour ({profilAE.slotsModifies.join(', ')}) — relancez une qualification pour voir
-                      les questions reformulées
-                    </span>
-                  ) : (
-                    <span className="badge badge-neutral">Feedback reçu, aucun slot du profil ne correspond</span>
-                  )}
-                  <div className="question-meta" style={{ marginTop: 8, flexWrap: 'wrap' }}>
-                    {Object.entries(profilAE.profil).map(([slot, valeur]) => (
-                      <span key={slot} className="badge badge-neutral">
-                        {slot} : {valeur}
-                      </span>
-                    ))}
+            <details className="panel panel-toggle" open={!!profilAE}>
+              <summary>
+                Feedback sur le style des questions
+                {profilAE && profilAE.slotsModifies.length > 0 && (
+                  <span className="badge badge-ok">profil mis à jour</span>
+                )}
+              </summary>
+              <div className="panel-toggle-corps">
+                <form className="lead-form" onSubmit={envoyerFeedback}>
+                  <div className="lead-form-fields" style={{ gridTemplateColumns: '1fr' }}>
+                    <label>
+                      Ex. « tutoie-moi », « plus court », « évite le jargon »
+                      <input
+                        value={feedbackTexte}
+                        onChange={(e) => setFeedbackTexte(e.target.value)}
+                        placeholder="Comment préférez-vous que les questions soient formulées ?"
+                      />
+                    </label>
                   </div>
-                </div>
-              )}
-            </form>
+                  <button type="submit" disabled={feedbackEnCours || !feedbackTexte.trim()}>
+                    {feedbackEnCours ? 'Envoi…' : 'Mémoriser ma préférence'}
+                  </button>
+                  {profilAE && (
+                    <div style={{ marginTop: 10 }}>
+                      {profilAE.slotsModifies.length > 0 ? (
+                        <span className="badge badge-ok">
+                          Profil mis à jour ({profilAE.slotsModifies.join(', ')}) — relancez une qualification pour
+                          voir les questions reformulées
+                        </span>
+                      ) : (
+                        <span className="badge badge-neutral">Feedback reçu, aucun slot du profil ne correspond</span>
+                      )}
+                      <div className="question-meta" style={{ marginTop: 8, flexWrap: 'wrap' }}>
+                        {Object.entries(profilAE.profil).map(([slot, valeur]) => (
+                          <span key={slot} className="badge badge-neutral">
+                            {slot} : {valeur}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </form>
+              </div>
+            </details>
 
-            <details className="panel provenance">
-              <summary>Trace du run ({resultat.trace.length} évènements)</summary>
-              <div className="observation-list">
+            <details className="panel panel-toggle">
+              <summary>
+                Trace du run
+                <span className="badge badge-neutral">{resultat.trace.length} évènements</span>
+                {resultat.trace.some((t) => t.type === 'erreur') && (
+                  <span className="badge badge-danger">
+                    {resultat.trace.filter((t) => t.type === 'erreur').length} erreur(s)
+                  </span>
+                )}
+              </summary>
+              <div className="panel-toggle-corps table-scroll">
                 {resultat.trace.map((t, i) => (
-                  <div key={i}>
+                  <div key={i} className="trace-ligne">
+                    <span className="trace-heure">{t.horodatage.slice(11, 19)}</span>
                     <span className={t.type === 'erreur' ? 'badge badge-danger' : 'source-tag'}>{t.etape}</span>{' '}
                     {JSON.stringify(t.detail)}
                   </div>
@@ -275,7 +378,7 @@ export function QualifierLead() {
               </div>
             </details>
           </main>
-        </>
+        </div>
       )}
     </>
   );
